@@ -11,6 +11,20 @@ import {
   ICategorizerRepository,
 } from "./categorizer-repository";
 
+const ENTITY_SORT_FIELD_FALLBACKS: Record<string, string> = {
+  supURLs: "addTime",
+};
+
+const normalizeEntitySortBy = (sortBy: string) => {
+  const schemaProperties = Entity.schema.properties as Record<string, unknown>;
+
+  if (schemaProperties[sortBy]) {
+    return sortBy;
+  }
+
+  return ENTITY_SORT_FIELD_FALLBACKS[sortBy] || "addTime";
+};
+
 export interface IPaperEntityRepositoryState {
   count: number;
   updated: number;
@@ -77,6 +91,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
     sortOrder: "asce" | "desc"
   ) {
     let objects = realm.objects<Entity>("Entity");
+    const normalizedSortBy = normalizeEntitySortBy(sortBy);
     this.fire({ count: objects.length });
 
     if (!realm.entityListened) {
@@ -97,12 +112,16 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
 
     if (filter) {
       try {
-        return objects.filtered(`library == 'main' AND (${filter})`).sorted(sortBy, sortOrder === "desc");
+        return objects
+          .filtered(`library == 'main' AND (${filter})`)
+          .sorted(normalizedSortBy, sortOrder === "desc");
       } catch (error) {
         throw new Error(`Invalid filter: ${filter}`);
       }
     } else {
-      return objects.filtered("library == 'main'").sorted(sortBy, sortOrder === "desc");
+      return objects
+        .filtered("library == 'main'")
+        .sorted(normalizedSortBy, sortOrder === "desc");
     }
   }
 
