@@ -51,7 +51,21 @@
     "relatedpapers": "Verknüpfte Arbeiten",
     "searchrelatedpapers": "Arbeiten zum Verknüpfen suchen...",
     "norelatedpapers": "Noch keine verknüpften Arbeiten.",
-    "nopapersgraph": "Keine Arbeiten für den Graphen vorhanden."
+    "nopapersgraph": "Keine Arbeiten für den Graphen vorhanden.",
+    "graphunfiled": "Nicht abgelegt",
+    "graphSummary": "{nodes} Knoten · {links} Verbindungen · {folders} Ordner",
+    "graphActiveNodeMeta": "{related} verknüpft · {folder}{year, select, undefined {} other { · {year}}}",
+    "graphModeAll": "Gesamter Graph",
+    "graphModeNeighborhood": "Nachbarschaft",
+    "graphZoomIn": "Vergrößern",
+    "graphZoomOut": "Verkleinern",
+    "graphNeighborhoodSelectTitle": "Wähle eine Arbeit aus, um ihre Nachbarschaft anzuzeigen.",
+    "graphNeighborhoodSelectDescription": "Der Nachbarschaftsmodus zentriert den Graphen auf die aktuelle Auswahl und zeigt nur direkt verbundene Arbeiten an.",
+    "graphNeighborhoodUnavailableTitle": "Die ausgewählte Arbeit ist in diesem Graphen nicht verfügbar.",
+    "graphNeighborhoodUnavailableDescription": "Wähle eine Arbeit, die im aktuellen Graphen sichtbar ist, oder wechsle zurück zur Ansicht des gesamten Graphen.",
+    "graphEmptyDescription": "Füge verknüpfte Arbeiten hinzu oder wähle einen umfassenderen Ordner, um hier Verbindungen zu sehen.",
+    "graphLegendDescription": "Bewege den Mauszeiger über einen Knoten oder fokussiere ihn, um seine direkte Nachbarschaft hervorzuheben.",
+    "graphInteractionHint": "Ziehe den leeren Bereich zum Verschieben. Scrolle zum Zoomen. Drücke +, -, 0 oder Esc, wenn diese Ansicht fokussiert ist."
   },
   "smartfilter": {
     "startops": "Start Ops",

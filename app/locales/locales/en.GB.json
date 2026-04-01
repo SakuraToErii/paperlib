@@ -55,7 +55,21 @@
     "relatedpapers": "Related Papers",
     "searchrelatedpapers": "Search papers to relate...",
     "norelatedpapers": "No related papers yet.",
-    "nopapersgraph": "No papers to show in the graph."
+    "nopapersgraph": "No papers to show in the graph.",
+    "graphunfiled": "Unfiled",
+    "graphSummary": "{nodes} nodes · {links} links · {folders} folders",
+    "graphActiveNodeMeta": "{related} related · {folder}{year, select, undefined {} other { · {year}}}",
+    "graphModeAll": "Whole graph",
+    "graphModeNeighborhood": "Neighborhood",
+    "graphZoomIn": "Zoom in",
+    "graphZoomOut": "Zoom out",
+    "graphNeighborhoodSelectTitle": "Select a paper to show its neighborhood.",
+    "graphNeighborhoodSelectDescription": "Neighborhood mode centers the graph on the current selection and shows only directly related papers.",
+    "graphNeighborhoodUnavailableTitle": "Selected paper is not available in this graph.",
+    "graphNeighborhoodUnavailableDescription": "Choose a paper that is visible in the current graph, or switch back to the whole graph view.",
+    "graphEmptyDescription": "Add related papers or select a broader folder to see connections here.",
+    "graphLegendDescription": "Hover or focus a node to highlight its immediate neighborhood.",
+    "graphInteractionHint": "Drag empty space to pan. Scroll to zoom. Press +, -, 0, or Esc while this view is focused."
   },
   "smartfilter": {
     "startops": "Start Ops",

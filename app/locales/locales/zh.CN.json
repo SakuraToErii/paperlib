@@ -55,7 +55,21 @@
     "relatedpapers": "关联论文",
     "searchrelatedpapers": "搜索要关联的论文...",
     "norelatedpapers": "暂时没有关联论文。",
-    "nopapersgraph": "当前没有可显示在图谱中的论文。"
+    "nopapersgraph": "当前没有可显示在图谱中的论文。",
+    "graphunfiled": "未归档",
+    "graphSummary": "{nodes} 个节点 · {links} 条连接 · {folders} 个文件夹",
+    "graphActiveNodeMeta": "{related} 个关联项 · {folder}{year, select, undefined {} other { · {year}}}",
+    "graphModeAll": "完整图谱",
+    "graphModeNeighborhood": "邻域",
+    "graphZoomIn": "放大",
+    "graphZoomOut": "缩小",
+    "graphNeighborhoodSelectTitle": "选择一篇论文以显示其邻域。",
+    "graphNeighborhoodSelectDescription": "邻域模式会将图谱聚焦到当前选中的论文，并只显示直接关联的论文。",
+    "graphNeighborhoodUnavailableTitle": "当前图谱中无法显示所选论文。",
+    "graphNeighborhoodUnavailableDescription": "请选择当前图谱中可见的论文，或切换回完整图谱视图。",
+    "graphEmptyDescription": "添加关联论文，或选择更大的文件夹范围，即可在此查看连接关系。",
+    "graphLegendDescription": "悬停或聚焦某个节点，以高亮它的直接邻域。",
+    "graphInteractionHint": "拖动画布空白处可平移。滚动可缩放。聚焦此视图时可按 +、-、0 或 Esc。"
   },
   "smartfilter": {
     "startops": "起始运算符",

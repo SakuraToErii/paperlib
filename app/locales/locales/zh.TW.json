@@ -51,7 +51,21 @@
     "relatedpapers": "關聯論文",
     "searchrelatedpapers": "搜尋要關聯的論文...",
     "norelatedpapers": "目前沒有關聯論文。",
-    "nopapersgraph": "目前沒有可顯示在圖譜中的論文。"
+    "nopapersgraph": "目前沒有可顯示在圖譜中的論文。",
+    "graphunfiled": "未歸檔",
+    "graphSummary": "{nodes} 個節點 · {links} 條連線 · {folders} 個資料夾",
+    "graphActiveNodeMeta": "{related} 個關聯項目 · {folder}{year, select, undefined {} other { · {year}}}",
+    "graphModeAll": "完整圖譜",
+    "graphModeNeighborhood": "鄰域",
+    "graphZoomIn": "放大",
+    "graphZoomOut": "縮小",
+    "graphNeighborhoodSelectTitle": "選擇一篇論文以顯示其鄰域。",
+    "graphNeighborhoodSelectDescription": "鄰域模式會將圖譜聚焦於目前選取的論文，並只顯示直接相關的論文。",
+    "graphNeighborhoodUnavailableTitle": "目前圖譜中無法顯示所選論文。",
+    "graphNeighborhoodUnavailableDescription": "請選擇目前圖譜中可見的論文，或切換回完整圖譜視圖。",
+    "graphEmptyDescription": "新增關聯論文，或選擇更大的資料夾範圍，即可在此查看連線關係。",
+    "graphLegendDescription": "懸停或聚焦某個節點，以醒目顯示它的直接鄰域。",
+    "graphInteractionHint": "拖曳畫布空白處可平移。滾動可縮放。聚焦此視圖時可按 +、-、0 或 Esc。"
   },
   "smartfilter": {
     "startops": "起始運算子",
