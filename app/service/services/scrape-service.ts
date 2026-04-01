@@ -113,24 +113,40 @@ export class ScrapeService extends Eventable<{}> {
     specificScrapers: string[],
     force: boolean = false
   ): Promise<Entity[]> {
+    const directPaperEntityDrafts = payloads
+      .filter((payload) => payload?.type === "PaperEntity" && payload?.value)
+      .map((payload) => new Entity(payload.value));
+
+    const entryPayloads = payloads.filter(
+      (payload) => payload?.type !== "PaperEntity" || !payload?.value
+    );
+
+    if (entryPayloads.length === 0) {
+      return this.scrapeMetadata(
+        directPaperEntityDrafts,
+        specificScrapers,
+        force
+      );
+    }
+
     // 0. Wait for scraper extension to be ready.
     await this._scrapeExtensionReady();
 
     // Do in chunks 10
     const jobID = Math.random().toString(36).substring(7);
-    const results: Entity[] = [];
-    for (let i = 0; i < payloads.length; i += 10) {
-      if (payloads.length >= 20) {
+    const results: Entity[] = [...directPaperEntityDrafts];
+    for (let i = 0; i < entryPayloads.length; i += 10) {
+      if (entryPayloads.length >= 20) {
         this._logService.progress(
-          `Processing ${i} / ${payloads.length}...`,
-          (i / payloads.length) * 100,
+          `Processing ${i} / ${entryPayloads.length}...`,
+          (i / entryPayloads.length) * 100,
           true,
           "ScrapeService",
           jobID
         );
       }
       try {
-        let payloadChunk = payloads.slice(i, i + 10);
+        const payloadChunk = entryPayloads.slice(i, i + 10);
 
         // 1. Entry scraper transforms data source payloads into a PaperEntity list.
         const paperEntityDrafts =
