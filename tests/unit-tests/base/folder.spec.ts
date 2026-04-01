@@ -8,6 +8,8 @@ import {
   isInternalLibraryPath,
   normalizeFolderPath,
 } from "../../../app/base/folder";
+import { QuerySentenceService } from "../../../app/renderer/services/querysentence-service";
+import { CategorizerType } from "../../../app/models/categorizer";
 
 describe("folder query contract invariants", () => {
   it("normalizes recursive folder inputs before building prefix queries", () => {
@@ -70,5 +72,27 @@ describe("sync/internal library path safety", () => {
       false
     );
     expect(isInternalLibraryPath("folder/library.realm.txt")).toBe(false);
+  });
+});
+
+describe("folder query integration invariants", () => {
+  it("escapes quoted folder names when building renderer folder queries", () => {
+    const service = new QuerySentenceService();
+    const graph = service.parseDAG(
+      [
+        {
+          _id: "folder-id" as any,
+          name: 'Research/ML "Agents"',
+          color: "blue",
+          count: 1,
+          children: [],
+        },
+      ],
+      CategorizerType.PaperFolder
+    );
+
+    expect(graph.getNodeAttribute("folder-id", "query")).toBe(
+      '(ANY folders.name == "Research/ML \\\"Agents\\\"") OR (ANY folders.name BEGINSWITH "Research/ML \\\"Agents\\\"/")'
+    );
   });
 });
