@@ -4,10 +4,13 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { Entity, IEntityCollection } from "@/models/entity";
 import {
   buildPaperGraph,
+  getPaperGraphNeighborhood,
   layoutPaperGraph,
   PaperGraphEdge,
   PaperGraphNode,
 } from "@/renderer/utils/paper-graph";
+
+type GraphDisplayMode = "all" | "neighborhood";
 
 const props = defineProps({
   entities: {
@@ -37,6 +40,7 @@ const panY = ref(0);
 const hoveredNodeId = ref("");
 const focusedNodeId = ref("");
 const isPanning = ref(false);
+const graphDisplayMode = ref<GraphDisplayMode>("all");
 const panStart = ref({ x: 0, y: 0, panX: 0, panY: 0 });
 
 const updateViewport = () => {
@@ -67,7 +71,7 @@ onUnmounted(() => {
 });
 
 watch(
-  () => props.entities,
+  () => [props.entities, props.selectedIndex, graphDisplayMode.value],
   () => {
     if (zoom.value === 1 && panX.value === 0 && panY.value === 0) {
       return;
@@ -97,11 +101,25 @@ const indexById = computed(() => {
   }, {} as Record<string, number>);
 });
 
+const baseGraph = computed(() => buildPaperGraph(entitiesList.value, props.graphPalette));
+
+const shouldShowNeighborhoodSelectionState = computed(() => {
+  return graphDisplayMode.value === "neighborhood" && !selectedNodeId.value;
+});
+
 const graph = computed(() => {
-  const builtGraph = buildPaperGraph(entitiesList.value, props.graphPalette);
+  const graphData =
+    graphDisplayMode.value === "neighborhood" && selectedNodeId.value
+      ? getPaperGraphNeighborhood(baseGraph.value, selectedNodeId.value)
+      : {
+          nodes: [...baseGraph.value.nodes],
+          edges: [...baseGraph.value.edges],
+        };
+
   return {
-    ...builtGraph,
-    nodes: layoutPaperGraph(builtGraph.nodes, builtGraph.edges),
+    ...baseGraph.value,
+    ...graphData,
+    nodes: layoutPaperGraph(graphData.nodes, graphData.edges),
   };
 });
 
@@ -186,7 +204,7 @@ const edgeOpacity = (edge: PaperGraphEdge) => {
 
 const labelVisible = (node: PaperGraphNode) => {
   return (
-    props.entities.length <= 18 ||
+    graph.value.nodes.length <= 18 ||
     node.id === activeNodeId.value ||
     activeNodeSet.value.has(node.id)
   );
@@ -246,13 +264,24 @@ const zoomBy = (factor: number) => {
   zoom.value = Math.min(2.5, Math.max(0.4, zoom.value * factor));
 };
 
+const setGraphDisplayMode = (mode: GraphDisplayMode) => {
+  graphDisplayMode.value = mode;
+};
+
 const onWheel = (event: WheelEvent) => {
+  if (shouldShowNeighborhoodSelectionState.value) {
+    return;
+  }
+
   event.preventDefault();
   zoomBy(event.deltaY > 0 ? 0.92 : 1.08);
 };
 
 const onPointerDown = (event: MouseEvent) => {
-  if ((event.target as HTMLElement)?.closest("[data-node-id], button")) {
+  if (
+    shouldShowNeighborhoodSelectionState.value ||
+    (event.target as HTMLElement)?.closest("[data-node-id], button")
+  ) {
     return;
   }
 
@@ -325,6 +354,10 @@ const onContainerKeydown = (event: KeyboardEvent) => {
     return;
   }
 
+  if (shouldShowNeighborhoodSelectionState.value) {
+    return;
+  }
+
   if (event.key === "+" || event.key === "=") {
     event.preventDefault();
     zoomBy(1.12);
@@ -353,14 +386,20 @@ const graphTransform = computed(() => {
     ref="container"
     tabindex="0"
     class="relative w-full h-[calc(100vh-4rem)] overflow-hidden rounded-md border border-neutral-200 bg-gradient-to-br from-white via-neutral-50 to-neutral-100 shadow-sm outline-none dark:border-neutral-700 dark:from-neutral-900 dark:via-neutral-900 dark:to-neutral-950"
-    :class="isPanning ? 'cursor-grabbing' : 'cursor-default'"
+    :class="[
+      isPanning ? 'cursor-grabbing' : 'cursor-default',
+      shouldShowNeighborhoodSelectionState ? 'cursor-not-allowed' : ''
+    ]"
     @mousedown="onPointerDown"
     @wheel="onWheel"
     @mouseleave="hoveredNodeId = ''"
     @keydown="onContainerKeydown"
   >
     <div class="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/70 to-transparent dark:from-neutral-950/40"></div>
-    <svg class="h-full w-full select-none">
+    <svg
+      class="h-full w-full select-none"
+      :class="shouldShowNeighborhoodSelectionState ? 'pointer-events-none opacity-40' : ''"
+    >
       <defs>
         <marker
           id="paper-graph-arrow"
@@ -446,6 +485,30 @@ const graphTransform = computed(() => {
         {{ visibleNodeCount }} nodes · {{ visibleEdgeCount }} links · {{ legendSummary }} folders
       </div>
       <div
+        class="pointer-events-auto rounded-lg border border-neutral-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-neutral-700 dark:bg-neutral-800/90"
+      >
+        <div class="grid grid-cols-2 gap-1">
+          <button
+            class="h-8 rounded-md px-3 text-xxs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-400"
+            :class="graphDisplayMode === 'all'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-700'"
+            @click="setGraphDisplayMode('all')"
+          >
+            Whole graph
+          </button>
+          <button
+            class="h-8 rounded-md px-3 text-xxs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-400"
+            :class="graphDisplayMode === 'neighborhood'
+              ? 'bg-blue-600 text-white shadow-sm'
+              : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-700'"
+            @click="setGraphDisplayMode('neighborhood')"
+          >
+            Neighborhood
+          </button>
+        </div>
+      </div>
+      <div
         v-if="activeNode"
         class="max-w-[18rem] rounded-md border border-blue-200 bg-blue-50/95 px-3 py-2 text-xxs text-blue-900 shadow-sm backdrop-blur dark:border-blue-900/80 dark:bg-blue-950/70 dark:text-blue-100"
       >
@@ -459,23 +522,26 @@ const graphTransform = computed(() => {
 
     <div class="absolute right-3 top-3 flex flex-col gap-2">
       <button
-        class="h-8 rounded-md border border-neutral-200 bg-white/90 px-3 text-xxs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-neutral-700 dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
+        class="h-8 rounded-md border border-neutral-200 bg-white/90 px-3 text-xxs font-medium text-neutral-700 shadow-sm transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
         :aria-label="$t('menu.graphfit')"
+        :disabled="shouldShowNeighborhoodSelectionState"
         @click="fitGraph"
       >
         {{ $t("menu.graphfit") }}
       </button>
       <div class="grid grid-cols-2 gap-2 rounded-md border border-neutral-200 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-neutral-700 dark:bg-neutral-800/90">
         <button
-          class="h-7 rounded-md border border-neutral-200 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          class="h-7 rounded-md border border-neutral-200 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700"
           aria-label="Zoom in"
+          :disabled="shouldShowNeighborhoodSelectionState"
           @click="zoomBy(1.12)"
         >
           +
         </button>
         <button
-          class="h-7 rounded-md border border-neutral-200 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          class="h-7 rounded-md border border-neutral-200 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700"
           aria-label="Zoom out"
+          :disabled="shouldShowNeighborhoodSelectionState"
           @click="zoomBy(0.9)"
         >
           −
@@ -484,7 +550,21 @@ const graphTransform = computed(() => {
     </div>
 
     <div
-      v-if="graph.nodes.length === 0"
+      v-if="shouldShowNeighborhoodSelectionState"
+      class="absolute inset-0 flex items-center justify-center p-6"
+    >
+      <div class="max-w-sm rounded-xl border border-dashed border-neutral-300 bg-white/90 px-6 py-5 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/90">
+        <div class="text-sm font-semibold text-neutral-700 dark:text-neutral-200">
+          Select a paper to show its neighborhood.
+        </div>
+        <div class="mt-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
+          Neighborhood mode centers the graph on the current selection and shows only directly related papers.
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-else-if="graph.nodes.length === 0"
       class="absolute inset-0 flex items-center justify-center p-6"
     >
       <div class="max-w-sm rounded-xl border border-dashed border-neutral-300 bg-white/80 px-6 py-5 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/80">
