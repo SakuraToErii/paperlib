@@ -701,9 +701,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
   @processing(ProcessingKey.General)
   @errorcatching("Failed to batch update related papers.", true, "PaperService")
-  async setBatchRelatedPaperIds(paperIds: OID[], fromSync: boolean = false) {
+  async relateSelectedPapers(ids: OID[], fromSync: boolean = false) {
     const normalizedPaperIds = Array.from(
-      new Set(paperIds.map((id) => `${id}`).filter((id) => ObjectId.isValid(id)))
+      new Set(ids.map((id) => `${id}`).filter((id) => ObjectId.isValid(id)))
     );
 
     if (normalizedPaperIds.length === 0) {
@@ -746,9 +746,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
   @processing(ProcessingKey.General)
   @errorcatching("Failed to batch remove related papers.", true, "PaperService")
-  async removeBatchRelatedPaperIds(paperIds: OID[], fromSync: boolean = false) {
+  async unrelateSelectedPapers(ids: OID[], fromSync: boolean = false) {
     const normalizedPaperIds = Array.from(
-      new Set(paperIds.map((id) => `${id}`).filter((id) => ObjectId.isValid(id)))
+      new Set(ids.map((id) => `${id}`).filter((id) => ObjectId.isValid(id)))
     );
 
     if (normalizedPaperIds.length === 0) {
