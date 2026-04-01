@@ -70,6 +70,8 @@ export interface IContextMenuServiceState {
   dataContextMenuFuzzyScrapeClicked: number;
   dataContextMenuDeleteClicked: number;
   dataContextMenuFlagClicked: number;
+  dataContextMenuRelateClicked: number;
+  dataContextMenuUnrelateClicked: number;
   dataContextMenuExportBibTexClicked: number;
   dataContextMenuExportBibItemClicked: number;
   dataContextMenuExportCSVClicked: number;
@@ -118,6 +120,8 @@ export class ContextMenuService extends Eventable<IContextMenuServiceState> {
       dataContextMenuFuzzyScrapeClicked: 0,
       dataContextMenuDeleteClicked: 0,
       dataContextMenuFlagClicked: 0,
+      dataContextMenuRelateClicked: 0,
+      dataContextMenuUnrelateClicked: 0,
       dataContextMenuExportBibTexClicked: 0,
       dataContextMenuExportBibItemClicked: 0,
       dataContextMenuExportCSVClicked: 0,
@@ -176,7 +180,12 @@ export class ContextMenuService extends Eventable<IContextMenuServiceState> {
     false,
     "ContextMenu"
   )
-  showPaperDataMenu(allowEdit: boolean, categorizeList: CategorizerMenuItem[]) {
+  showPaperDataMenu(
+    allowEdit: boolean,
+    categorizeList: CategorizerMenuItem[],
+    allowRelate: boolean = false,
+    allowUnrelate: boolean = false
+  ) {
     let removeFolderMenuTemplate: MenuItemConstructorOptions[] = [];
     let removeTagMenuTemplate: MenuItemConstructorOptions[] = [];
     categorizeList.forEach(({ type, name, id }) => {
@@ -274,6 +283,20 @@ export class ContextMenuService extends Eventable<IContextMenuServiceState> {
         accelerator: PLMainAPILocal.preferenceService.get("shortcutFlag") as string,
         click: () => {
           this.fire("dataContextMenuFlagClicked");
+        },
+      },
+      {
+        label: this._locales.t("menu.relate"),
+        enabled: allowRelate,
+        click: () => {
+          this.fire("dataContextMenuRelateClicked");
+        },
+      },
+      {
+        label: this._locales.t("menu.unrelate"),
+        enabled: allowUnrelate,
+        click: () => {
+          this.fire("dataContextMenuUnrelateClicked");
         },
       },
       {

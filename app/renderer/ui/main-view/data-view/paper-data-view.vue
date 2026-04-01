@@ -7,7 +7,7 @@ import { disposable } from "@/base/dispose";
 import { eraseProtocol } from "@/base/url";
 import { CategorizerMenuItem, CategorizerType } from "@/models/categorizer";
 import { FieldTemplate } from "@/renderer/types/data-view";
-import { IEntityCollection } from "@/models/entity";
+import { Entity, IEntityCollection } from "@/models/entity";
 
 import PaperGraphView from "./components/graph-view/paper-graph-view.vue";
 import ListView from "./components/list-view/list-view.vue";
@@ -29,6 +29,86 @@ const itemSize = ref(28);
 // ================================
 const paperEntities = inject<Ref<IEntityCollection>>("paperEntities")!;
 const displayingURL = ref("");
+
+const pushNotification = (title: string, content: string) => {
+  const notificationId = `batch-related-paper-${Date.now()}-${Math.random()}`;
+  PLUIAPILocal.uiSlotService.updateSlot("overlayNotifications", {
+    [notificationId]: { title, content },
+  });
+};
+
+const getSelectedPaperEntities = (selectedList: number[]) => {
+  return selectedList
+    .map((index) => paperEntities.value[index])
+    .filter((paper): paper is Entity => Boolean(paper));
+};
+
+const getSelectedPaperIds = (selectedList: number[]) => {
+  return getSelectedPaperEntities(selectedList).map((paper) => paper._id);
+};
+
+const canRelateSelection = (selectedList: number[]) => {
+  return getSelectedPaperIds(selectedList).length >= 2;
+};
+
+const canUnrelateSelection = (selectedList: number[]) => {
+  const selectedPaperEntities = getSelectedPaperEntities(selectedList);
+  if (selectedPaperEntities.length < 2) {
+    return false;
+  }
+
+  const selectedPaperIdSet = new Set(
+    selectedPaperEntities.map((paper) => `${paper._id}`)
+  );
+
+  return selectedPaperEntities.some((paper) =>
+    (paper.relatedPaperIds || []).some((relatedPaperId) =>
+      selectedPaperIdSet.has(`${relatedPaperId}`)
+    )
+  );
+};
+
+const relateSelectedPapers = async (selectedList: number[]) => {
+  const selectedPaperIds = getSelectedPaperIds(selectedList);
+  if (selectedPaperIds.length < 2) {
+    return;
+  }
+
+  try {
+    await PLAPI.paperService.relateSelectedPapers(selectedPaperIds as any);
+    PLUIAPILocal.uiStateService.setState({ entitiesReloaded: Date.now() });
+    pushNotification(
+      "Related papers updated",
+      `${selectedPaperIds.length} papers are now related.`
+    );
+  } catch (error) {
+    pushNotification(
+      "Failed to relate papers",
+      error instanceof Error ? error.message : "Unable to update paper relations."
+    );
+  }
+};
+
+const unrelateSelectedPapers = async (selectedList: number[]) => {
+  const selectedPaperIds = getSelectedPaperIds(selectedList);
+  if (selectedPaperIds.length < 2) {
+    return;
+  }
+
+  try {
+    await PLAPI.paperService.unrelateSelectedPapers(selectedPaperIds as any);
+    PLUIAPILocal.uiStateService.setState({ entitiesReloaded: Date.now() });
+    pushNotification(
+      "Related papers updated",
+      `Removed relations within ${selectedPaperIds.length} selected papers.`
+    );
+  } catch (error) {
+    pushNotification(
+      "Failed to unrelate papers",
+      error instanceof Error ? error.message : "Unable to update paper relations."
+    );
+  }
+};
 
 // For List View
 const fieldEnables = ref({});
@@ -154,6 +234,18 @@ disposable(
   )
 );
 
+disposable(
+  PLMainAPI.contextMenuService.on("dataContextMenuRelateClicked", () => {
+    void relateSelectedPapers(uiState.selectedIndex);
+  })
+);
+
+disposable(
+  PLMainAPI.contextMenuService.on("dataContextMenuUnrelateClicked", () => {
+    void unrelateSelectedPapers(uiState.selectedIndex);
+  })
+);
+
 const getCategorizeList = (selectedList: number[]) => {
   let categorizeIdSet = new Set<string>();
   let categorizeList: CategorizerMenuItem[] = [];
@@ -189,7 +281,9 @@ const onItemRightClicked = (selectedIndex: number[]) => {
   const categorizeList = getCategorizeList(selectedIndex);
   PLMainAPI.contextMenuService.showPaperDataMenu(
     uiState.selectedIndex.length === 1,
-    categorizeList
+    categorizeList,
+    canRelateSelection(selectedIndex),
+    canUnrelateSelection(selectedIndex)
   );
 };
 
