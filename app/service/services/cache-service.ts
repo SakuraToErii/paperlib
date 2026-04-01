@@ -1,7 +1,6 @@
 import { ObjectId } from "bson";
 import { promises } from "fs";
 import md5 from "md5-file";
-import * as mupdf from "mupdf";
 import { PrimaryKey, Results } from "realm";
 
 import { errorcatching } from "@/base/error";
@@ -19,6 +18,20 @@ import {
 
 import { Entity, IEntityCollection, IEntityObject } from "@/models/entity";
 import { FileService, IFileService } from "./file-service";
+
+type MuPDFModule = typeof import("mupdf");
+
+let mupdfModulePromise: Promise<MuPDFModule | null> | null = null;
+
+async function loadMuPDF(): Promise<MuPDFModule | null> {
+  if (!mupdfModulePromise) {
+    mupdfModulePromise = import("mupdf")
+      .then((module) => module as MuPDFModule)
+      .catch(() => null);
+  }
+
+  return mupdfModulePromise;
+}
 
 export const ICacheService = createDecorator("cacheService");
 
@@ -166,6 +179,18 @@ export class CacheService {
   private async _getPDFText(url: string): Promise<string> {
     try {
       if (!url) {
+        return "";
+      }
+
+      const mupdf = await loadMuPDF();
+
+      if (!mupdf) {
+        this._logService.warn(
+          "MuPDF is unavailable. Skipping PDF fulltext extraction.",
+          undefined,
+          false,
+          "CacheService"
+        );
         return "";
       }
 

@@ -2,7 +2,6 @@ import { promises as fsPromise } from "fs";
 import katex from "katex";
 import MarkdownIt from "markdown-it";
 import tm from "markdown-it-texmath";
-import * as mupdf from "mupdf";
 
 import { errorcatching } from "@/base/error";
 import { createDecorator } from "@/base/injection/injection";
@@ -14,6 +13,20 @@ const domPurifyInstance =
   typeof (globalThis as any).window !== "undefined"
     ? createDOMPurify((globalThis as any).window)
     : null;
+
+type MuPDFModule = typeof import("mupdf");
+
+let mupdfModulePromise: Promise<MuPDFModule | null> | null = null;
+
+async function loadMuPDF(): Promise<MuPDFModule | null> {
+  if (!mupdfModulePromise) {
+    mupdfModulePromise = import("mupdf")
+      .then((module) => module as MuPDFModule)
+      .catch(() => null);
+  }
+
+  return mupdfModulePromise;
+}
 
 export const IRenderService = createDecorator("renderService");
 
@@ -34,6 +47,12 @@ export class RenderService {
    * @returns Rendered PNG buffer
    */
   async renderPDF(fileURL: string) {
+    const mupdf = await loadMuPDF();
+
+    if (!mupdf) {
+      throw new Error("MuPDF is unavailable.");
+    }
+
     const doc = mupdf.Document.openDocument(
       await fsPromise.readFile(eraseProtocol(fileURL)),
       "application/pdf"
