@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { Entity, IEntityCollection } from "@/models/entity";
 import {
@@ -30,6 +31,7 @@ const props = defineProps({
 });
 
 const emits = defineEmits(["event:click", "event:dblclick"]);
+const i18n = useI18n();
 
 const container = ref<HTMLElement | null>(null);
 const viewportWidth = ref(960);
@@ -88,8 +90,12 @@ const selectedNodeId = computed(() => {
   return selectedEntity ? `${selectedEntity._id}` : "";
 });
 
+const hasSelectedNodeInGraph = computed(() => {
+  return !!selectedNodeId.value && baseGraph.value.nodes.some((node) => node.id === selectedNodeId.value);
+});
+
 const selectedEntity = computed(() => {
-  return selectedNodeId.value
+  return hasSelectedNodeInGraph.value && selectedNodeId.value
     ? entitiesList.value.find((entity) => `${entity._id}` === selectedNodeId.value)
     : undefined;
 });
@@ -104,17 +110,22 @@ const indexById = computed(() => {
 const baseGraph = computed(() => buildPaperGraph(entitiesList.value, props.graphPalette));
 
 const shouldShowNeighborhoodSelectionState = computed(() => {
-  return graphDisplayMode.value === "neighborhood" && !selectedNodeId.value;
+  return graphDisplayMode.value === "neighborhood" && !hasSelectedNodeInGraph.value;
 });
 
 const graph = computed(() => {
   const graphData =
-    graphDisplayMode.value === "neighborhood" && selectedNodeId.value
+    graphDisplayMode.value === "neighborhood" && hasSelectedNodeInGraph.value
       ? getPaperGraphNeighborhood(baseGraph.value, selectedNodeId.value)
-      : {
-          nodes: [...baseGraph.value.nodes],
-          edges: [...baseGraph.value.edges],
-        };
+      : graphDisplayMode.value === "neighborhood"
+        ? {
+            nodes: [],
+            edges: [],
+          }
+        : {
+            nodes: [...baseGraph.value.nodes],
+            edges: [...baseGraph.value.edges],
+          };
 
   return {
     ...baseGraph.value,
@@ -253,6 +264,24 @@ const nodeRingOpacity = (node: PaperGraphNode) => {
 const visibleNodeCount = computed(() => graph.value.nodes.length);
 const visibleEdgeCount = computed(() => graph.value.edges.length);
 const legendSummary = computed(() => legendEntries.value.length);
+const graphSummaryText = computed(() =>
+  i18n.t("mainview.graphSummary", {
+    nodes: visibleNodeCount.value,
+    links: visibleEdgeCount.value,
+    folders: legendSummary.value,
+  })
+);
+const activeNodeMetaText = computed(() => {
+  if (!activeNode.value) {
+    return "";
+  }
+
+  return i18n.t("mainview.graphActiveNodeMeta", {
+    related: activeNode.value.relationCount,
+    folder: activeNode.value.rootFolder || i18n.t("mainview.graphunfiled"),
+    year: activeNode.value.year,
+  });
+});
 
 const fitGraph = () => {
   zoom.value = 1;
@@ -482,7 +511,7 @@ const graphTransform = computed(() => {
       class="pointer-events-none absolute left-3 top-3 flex flex-wrap gap-2"
     >
       <div class="rounded-md border border-neutral-200 bg-white/90 px-3 py-2 text-xxs text-neutral-600 shadow-sm backdrop-blur dark:border-neutral-700 dark:bg-neutral-800/90 dark:text-neutral-300">
-        {{ visibleNodeCount }} nodes · {{ visibleEdgeCount }} links · {{ legendSummary }} folders
+        {{ graphSummaryText }}
       </div>
       <div
         class="pointer-events-auto rounded-lg border border-neutral-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-neutral-700 dark:bg-neutral-800/90"
@@ -495,7 +524,7 @@ const graphTransform = computed(() => {
               : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-700'"
             @click="setGraphDisplayMode('all')"
           >
-            Whole graph
+            {{ $t("mainview.graphModeAll") }}
           </button>
           <button
             class="h-8 rounded-md px-3 text-xxs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-blue-400"
@@ -504,7 +533,7 @@ const graphTransform = computed(() => {
               : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-700'"
             @click="setGraphDisplayMode('neighborhood')"
           >
-            Neighborhood
+            {{ $t("mainview.graphModeNeighborhood") }}
           </button>
         </div>
       </div>
@@ -514,8 +543,7 @@ const graphTransform = computed(() => {
       >
         <div class="font-semibold truncate">{{ activeNode.label }}</div>
         <div class="mt-1 text-[10px] text-blue-700 dark:text-blue-200">
-          {{ activeNode.relationCount }} related · {{ activeNode.rootFolder || 'Unfiled' }}
-          <span v-if="activeNode.year">· {{ activeNode.year }}</span>
+          {{ activeNodeMetaText }}
         </div>
       </div>
     </div>
@@ -532,7 +560,7 @@ const graphTransform = computed(() => {
       <div class="grid grid-cols-2 gap-2 rounded-md border border-neutral-200 bg-white/90 p-2 shadow-sm backdrop-blur dark:border-neutral-700 dark:bg-neutral-800/90">
         <button
           class="h-7 rounded-md border border-neutral-200 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700"
-          aria-label="Zoom in"
+          :aria-label="$t('mainview.graphZoomIn')"
           :disabled="shouldShowNeighborhoodSelectionState"
           @click="zoomBy(1.12)"
         >
@@ -540,7 +568,7 @@ const graphTransform = computed(() => {
         </button>
         <button
           class="h-7 rounded-md border border-neutral-200 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700"
-          aria-label="Zoom out"
+          :aria-label="$t('mainview.graphZoomOut')"
           :disabled="shouldShowNeighborhoodSelectionState"
           @click="zoomBy(0.9)"
         >
@@ -555,10 +583,12 @@ const graphTransform = computed(() => {
     >
       <div class="max-w-sm rounded-xl border border-dashed border-neutral-300 bg-white/90 px-6 py-5 text-center shadow-sm dark:border-neutral-700 dark:bg-neutral-900/90">
         <div class="text-sm font-semibold text-neutral-700 dark:text-neutral-200">
-          Select a paper to show its neighborhood.
+          {{ selectedNodeId ? $t("mainview.graphNeighborhoodUnavailableTitle") : $t("mainview.graphNeighborhoodSelectTitle") }}
         </div>
         <div class="mt-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          Neighborhood mode centers the graph on the current selection and shows only directly related papers.
+          {{ selectedNodeId
+            ? $t("mainview.graphNeighborhoodUnavailableDescription")
+            : $t("mainview.graphNeighborhoodSelectDescription") }}
         </div>
       </div>
     </div>
@@ -572,7 +602,7 @@ const graphTransform = computed(() => {
           {{ $t("mainview.nopapersgraph") }}
         </div>
         <div class="mt-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
-          Add related papers or select a broader folder to see connections here.
+          {{ $t("mainview.graphEmptyDescription") }}
         </div>
       </div>
     </div>
@@ -587,7 +617,7 @@ const graphTransform = computed(() => {
             {{ $t("mainview.graphlegend") }}
           </div>
           <div class="mt-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-            Hover or focus a node to highlight its immediate neighborhood.
+            {{ $t("mainview.graphLegendDescription") }}
           </div>
         </div>
         <div class="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-medium text-neutral-500 dark:bg-neutral-700/80 dark:text-neutral-300">
@@ -610,7 +640,7 @@ const graphTransform = computed(() => {
         </div>
       </div>
       <div class="mt-3 border-t border-neutral-200 pt-2 text-[10px] leading-4 text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
-        Drag empty space to pan. Scroll to zoom. Press +, -, 0, or Esc safely while this view is focused.
+        {{ $t("mainview.graphInteractionHint") }}
       </div>
     </div>
   </div>
