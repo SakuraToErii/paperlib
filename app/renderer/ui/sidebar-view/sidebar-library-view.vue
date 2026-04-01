@@ -163,22 +163,46 @@ const onDroped = async (
   }
 };
 
-const onUpdate = (
+const onUpdate = async (
   type: CategorizerType | PaperSmartFilterType,
-  patch: { parent_id?: string; name: string }
+  patch: { parent_id?: string; _id?: string; name: string }
 ) => {
   editingItemId.value = "";
   if (type === PaperSmartFilterType.smartfilter) {
   } else {
+    let parentCategorizer: Categorizer | undefined;
     if (patch.parent_id) {
-      PLAPI.categorizerService.update(
-        type,
-        new Categorizer(patch, false),
-        new Categorizer({ _id: patch.parent_id }, false)
-      );
-    } else {
-      PLAPI.categorizerService.update(type, new Categorizer(patch, false));
+      parentCategorizer = (
+        await PLAPI.categorizerService.loadByIds(type as CategorizerType, [
+          patch.parent_id,
+        ])
+      )[0] as Categorizer | undefined;
     }
+
+    if (patch._id) {
+      const existingCategorizer = (
+        await PLAPI.categorizerService.loadByIds(type as CategorizerType, [
+          patch._id,
+        ])
+      )[0] as Categorizer | undefined;
+
+      if (
+        type === CategorizerType.PaperFolder &&
+        existingCategorizer &&
+        !patch.parent_id
+      ) {
+        const parentPath = existingCategorizer.name.split("/").slice(0, -1).join("/");
+        if (parentPath) {
+          parentCategorizer = new Categorizer({ name: parentPath }, false);
+        }
+      }
+    }
+
+    await PLAPI.categorizerService.update(
+      type as CategorizerType,
+      new Categorizer(patch, false),
+      parentCategorizer
+    );
   }
 };
 
