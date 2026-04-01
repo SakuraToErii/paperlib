@@ -414,43 +414,19 @@ export class SyncService extends Eventable<ISyncServiceState> {
       // 1. local log_id is different from remote log_id
       // 2. timestamp is later than lastSyncAt
       (r) =>
-        (!localLogs.some(
-          (local) =>
-            local.log_id === r.log_id)) &&
+        !localLogs.some((local) => local.log_id === r.log_id) &&
         (!lastSyncAt || new Date(r.timestamp) > new Date(lastSyncAt))
     );
 
+    const mergedLogs = [...localLogs, ...filteredLogs].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime() ||
+        a.log_id.localeCompare(b.log_id)
+    );
+
     let synced = false;
-    // 4) Push local logs to the server
-    if (localLogs.length > 0) {
-      const postResponse = await fetch(syncUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(localLogs),
-      }).catch((error) => {
-        throw new Error("Failed to sync data (POST). " + error);
-      });
-      if (!postResponse.ok) {
-        throw new Error(
-          "Failed to sync data (POST). " + postResponse.statusText
-        );
-      }
-      const postResponseData = await postResponse.json();
-      if (postResponseData.code !== 2010) {
-        throw new Error(
-          "Failed to sync data: " + JSON.stringify(postResponseData)
-        );
-      }
-      // If push is successful, update lastSyncAt
-      this._deleteStoreValue("syncLogs");
-      synced = true;
-    }
-    console.log(filteredLogs);
-    // 5) Execute merge logic
-    for (const log of filteredLogs) {
+    // 4) Execute merge logic before pushing local logs so remote changes are replayed locally.
+    for (const log of mergedLogs) {
       if (!log.value) continue;
 
       const logValue = typeof log.value === "string" ? JSON.parse(log.value) : log.value;
@@ -497,7 +473,7 @@ export class SyncService extends Eventable<ISyncServiceState> {
               await PLAPILocal.feedService.update(logValue.feeds, true);
               break;
             case "delete":
-              await PLAPILocal.feedService.delete(logValue.ids, logValue.feeds);
+              await PLAPILocal.feedService.delete(logValue.ids, logValue.feeds, true);
               break;
             default:
               throw new Error("Unsupported feed operation: " + log.operation);
@@ -506,6 +482,34 @@ export class SyncService extends Eventable<ISyncServiceState> {
         default:
           throw new Error("Unsupported entity type: " + log.entity_type);
       }
+      synced = true;
+    }
+
+    // 5) Push local logs to the server after local replay succeeds.
+    if (localLogs.length > 0) {
+      const postResponse = await fetch(syncUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(localLogs),
+      }).catch((error) => {
+        throw new Error("Failed to sync data (POST). " + error);
+      });
+      if (!postResponse.ok) {
+        throw new Error(
+          "Failed to sync data (POST). " + postResponse.statusText
+        );
+      }
+      const postResponseData = await postResponse.json();
+      if (postResponseData.code !== 2010) {
+        throw new Error(
+          "Failed to sync data: " + JSON.stringify(postResponseData)
+        );
+      }
+      // If push is successful, update lastSyncAt
+      this._deleteStoreValue("syncLogs");
       synced = true;
     }
 

@@ -412,16 +412,51 @@ export class PaperService extends Eventable<IPaperServiceState> {
       "Entity"
     );
 
+    const realm = await this._databaseCore.realm();
+    const targetPaperEntities =
+      paperEntities ||
+      (ids
+        ? Array.from(this._paperEntityRepository.loadByIds(realm, ids))
+        : undefined);
+    const targetPaperIds = (ids || targetPaperEntities?.map((entity) => entity._id))?.map(
+      (id) => `${id}`
+    );
+
     if (!fromSync) {
       // FIXME: write log only if using sync.
       await PLAPILocal.syncService.addSyncLog("paper", "delete", {
         ids,
-        paperEntities,
+        paperEntities: targetPaperEntities,
+      });
+    }
+
+    if (targetPaperIds && targetPaperIds.length > 0) {
+      realm.safeWrite(() => {
+        const targetPaperIdSet = new Set(targetPaperIds);
+        const allPaperEntities = Array.from(
+          this._paperEntityRepository.load(realm, "", "title", "desc")
+        );
+
+        for (const paperEntity of allPaperEntities) {
+          if (targetPaperIdSet.has(`${paperEntity._id}`)) {
+            continue;
+          }
+
+          const relatedPaperIds = (paperEntity.relatedPaperIds || []).filter(
+            (relatedId) => !targetPaperIdSet.has(`${relatedId}`)
+          );
+
+          if (relatedPaperIds.length !== (paperEntity.relatedPaperIds || []).length) {
+            paperEntity.relatedPaperIds = relatedPaperIds.map(
+              (relatedId) => new ObjectId(`${relatedId}`)
+            ) as any;
+          }
+        }
       });
     }
 
     const toBeDeletedFiles = this._paperEntityRepository.delete(
-      await this._databaseCore.realm(),
+      realm,
       ids,
       paperEntities
     );
