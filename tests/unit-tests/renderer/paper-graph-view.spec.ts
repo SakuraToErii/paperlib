@@ -33,6 +33,35 @@ describe("graph neighborhood selection validity", () => {
     expect(graphData.edges).not.toEqual(baseGraph.edges);
   });
 
+  it("keeps neighborhood mode empty when the selection becomes stale after filtering or reload", () => {
+    const entities = [
+      makeEntity("paper-1", "Paper 1", ["paper-2"]),
+      makeEntity("paper-2", "Paper 2", ["paper-1", "paper-3"]),
+      makeEntity("paper-3", "Paper 3", ["paper-2"]),
+    ];
+
+    const baseGraph = buildPaperGraph(entities);
+    const selectedNodeId = "paper-2";
+    const initialGraphData = baseGraph.nodes.some((node) => node.id === selectedNodeId)
+      ? getPaperGraphNeighborhood(baseGraph, selectedNodeId)
+      : { nodes: [], edges: [] };
+
+    const filteredGraph = buildPaperGraph([
+      makeEntity("paper-1", "Paper 1", []),
+      makeEntity("paper-3", "Paper 3", []),
+    ]);
+    const filteredGraphData = filteredGraph.nodes.some((node) => node.id === selectedNodeId)
+      ? getPaperGraphNeighborhood(filteredGraph, selectedNodeId)
+      : { nodes: [], edges: [] };
+
+    expect(initialGraphData.nodes.map((node) => node.id).sort()).toEqual([
+      "paper-1",
+      "paper-2",
+      "paper-3",
+    ]);
+    expect(filteredGraphData).toEqual({ nodes: [], edges: [] });
+  });
+
   it("still shows the neighborhood for valid selections", () => {
     const entities = [
       makeEntity("paper-1", "Paper 1", ["paper-2"]),
