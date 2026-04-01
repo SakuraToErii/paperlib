@@ -1,3 +1,5 @@
+import path from "path";
+
 import { ObjectId } from "bson";
 import { chunkRun } from "@/base/chunk";
 import { errorcatching } from "@/base/error";
@@ -566,8 +568,10 @@ export class PaperService extends Eventable<IPaperServiceState> {
     // );
 
     const scrapedPaperEntityDrafts = urlList.map((url) => {
+      const filePath = url.startsWith("file://") ? decodeURIComponent(new URL(url).pathname) : url;
+      const fallbackTitle = path.basename(filePath, path.extname(filePath)) || "Imported paper";
       const paperEntityDraft = new Entity({
-        title: `Paper from file ${url}`,
+        title: fallbackTitle,
         year: "2025",
         booktitle: "Test booktitle",
         type: "inproceedings",
