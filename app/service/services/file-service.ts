@@ -443,13 +443,12 @@ export class FileService extends Eventable<IFileServiceState> {
           continue;
         }
 
-        const movedFilename = await backend.moveFile(
-          sup.url,
-          joinFolderPath(
-            folderPath,
-            `${formatedFilename}_${sup._id}${path.extname(sup.url)}`
-          )
+        const sourceURL = sup.url;
+        const targetRelativePath = joinFolderPath(
+          folderPath,
+          `${formatedFilename}_${sup._id}${path.extname(sup.url)}`
         );
+        const movedFilename = await backend.moveFile(sourceURL, targetRelativePath);
         sup.url = constructFileURL(
           movedFilename,
           false,
