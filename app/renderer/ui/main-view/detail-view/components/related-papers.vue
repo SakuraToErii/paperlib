@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 
 import { PaperFilterOptions } from "@/base/filter";
 import { debounce } from "@/base/misc";
@@ -12,6 +13,8 @@ const props = defineProps({
     required: true,
   },
 });
+
+const { t } = useI18n();
 
 const uiSlotState = PLUIAPILocal.uiSlotService.useState();
 
@@ -44,7 +47,7 @@ const pushNotification = (title: string, content: string) => {
 
 const formatPublicationMeta = (entity: Entity) => {
   const parts = [entity.year, getPublicationString(entity)].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : "Publication unavailable";
+  return parts.length > 0 ? parts.join(" · ") : t("mainview.relatedpapersPublicationUnavailable");
 };
 
 const formatAuthors = (authors?: string) => {
@@ -101,7 +104,10 @@ const addRelatedPaper = async (entity: Entity) => {
   searchText.value = "";
   searchResults.value = [];
   await updateRelatedPaperIds(nextRelatedIds);
-  pushNotification("Related paper added", entity.title || "A related paper was added.");
+  pushNotification(
+    t("mainview.relatedpapersNotificationAddedTitle"),
+    entity.title || t("mainview.relatedpapersNotificationAddedFallback")
+  );
 };
 
 const removeRelatedPaper = async (relatedEntity: Entity) => {
@@ -111,8 +117,8 @@ const removeRelatedPaper = async (relatedEntity: Entity) => {
     .filter((id) => id !== `${relatedEntity._id}`);
   await updateRelatedPaperIds(nextRelatedIds);
   pushNotification(
-    "Related paper removed",
-    relatedEntity.title || "A related paper was removed."
+    t("mainview.relatedpapersNotificationRemovedTitle"),
+    relatedEntity.title || t("mainview.relatedpapersNotificationRemovedFallback")
   );
 };
 
@@ -184,7 +190,7 @@ watch(searchText, () => {
       v-if="loadingRelatedEntities"
       class="rounded-md border border-dashed border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xxs text-neutral-400 dark:text-neutral-500"
     >
-      Loading related papers…
+      {{ $t("mainview.relatedpapersLoading") }}
     </div>
 
     <div v-else-if="!hasExistingRelatedPapers" class="space-y-1">
@@ -192,7 +198,7 @@ watch(searchText, () => {
         {{ $t("mainview.norelatedpapers") }}
       </div>
       <div class="text-[0.65rem] text-neutral-400 dark:text-neutral-500">
-        Search below to connect papers that belong in the same reading trail.
+        {{ $t("mainview.relatedpapersEmptyHint") }}
       </div>
     </div>
 
@@ -224,9 +230,9 @@ watch(searchText, () => {
             @click="removeRelatedPaper(relatedEntity)"
           >
             <span v-if="syncing && pendingRelatedPaperId === `${relatedEntity._id}`">
-              Removing…
+              {{ $t("mainview.relatedpapersRemoving") }}
             </span>
-            <span v-else>Remove</span>
+            <span v-else>{{ $t("mainview.relatedpapersRemove") }}</span>
           </button>
         </div>
       </div>
@@ -235,13 +241,13 @@ watch(searchText, () => {
     <div class="space-y-2 border-t border-neutral-200 pt-2 dark:border-neutral-700">
       <div class="flex items-center justify-between gap-2">
         <div class="text-xxs text-neutral-400 dark:text-neutral-500 select-none">
-          Add related paper
+          {{ $t("mainview.relatedpapersAddTitle") }}
         </div>
         <div
           v-if="syncing"
           class="text-[0.65rem] text-neutral-400 dark:text-neutral-500"
         >
-          Saving relation…
+          {{ $t("mainview.relatedpapersSaving") }}
         </div>
       </div>
 
@@ -260,7 +266,7 @@ watch(searchText, () => {
           v-if="searching"
           class="px-3 py-2 text-[0.65rem] text-neutral-400 dark:text-neutral-500"
         >
-          Searching papers…
+          {{ $t("mainview.relatedpapersSearching") }}
         </div>
 
         <div v-else-if="hasSearchResults" class="max-h-56 overflow-auto p-1">
@@ -288,9 +294,9 @@ watch(searchText, () => {
               </div>
               <div class="shrink-0 text-[0.65rem] text-accentlight">
                 <span v-if="syncing && pendingRelatedPaperId === `${result._id}`">
-                  Adding…
+                  {{ $t("mainview.relatedpapersAdding") }}
                 </span>
-                <span v-else>Add</span>
+                <span v-else>{{ $t("mainview.relatedpapersAdd") }}</span>
               </div>
             </div>
           </button>
@@ -300,7 +306,7 @@ watch(searchText, () => {
           v-else-if="hasSearchResultsMessage"
           class="px-3 py-2 text-[0.65rem] text-neutral-400 dark:text-neutral-500"
         >
-          No matching papers found for “{{ lastSearchText }}”.
+          {{ $t("mainview.relatedpapersNoMatches", { query: lastSearchText }) }}
         </div>
       </div>
     </div>
