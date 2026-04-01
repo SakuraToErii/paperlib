@@ -85,6 +85,95 @@ See [here](https://paperlib.app/en/download-linux.html).
 [Introduction (EN)](https://paperlib.app/en/doc/getting-started.html)  
 [Introduction (CN)](https://paperlib.app/cn/doc/getting-started.html)
 
+## Local Testing for This Fork
+
+This fork adds an Obsidian-style local-folder workflow, paper relations, and a paper graph view. The steps below are intended for local manual testing during development.
+
+### 1. Prepare the development environment
+
+- Install Node.js 20.14+.
+- Install pnpm.
+- Install dependencies:
+
+```bash
+pnpm install
+```
+
+### 2. Start the app in development mode
+
+```bash
+pnpm run dev
+```
+
+This launches the Electron app with the renderer in watch mode.
+
+### 3. Recommended local test setup
+
+Before testing the new behavior, prepare a clean local paper library on your machine, for example:
+
+```text
+~/Paperlib-Test-Library/
+  RL/
+    Exploration/
+    Reward-Shaping/
+  LLM/
+    Agents/
+    RAG/
+  Robot/
+    Manipulation/
+```
+
+Import several PDFs into different folders so that you can verify:
+- top-level folder color families (for example RL / LLM / Robot)
+- child-folder shade variations inside the same family
+- recursive folder browsing behavior
+- graph node sizing and edge directions
+
+### 4. Manual test checklist
+
+#### Folder structure behavior
+- Create a folder from the app and confirm the real local directory is created.
+- Rename a folder and confirm the real local directory is renamed.
+- Move a folder and confirm the real local directory moves with it.
+- Delete an empty folder and confirm the local directory is removed.
+- Verify that deleting a non-empty folder is blocked with proper feedback.
+- Select a parent folder and confirm papers from descendant folders are included.
+- Drag a paper into another folder and confirm its managed local path is updated.
+
+#### Related papers behavior
+- Open a paper detail panel and add related papers.
+- Confirm the relation is visible from both papers.
+- Remove a relation and confirm it disappears from both sides.
+- Delete a paper that has relations and confirm no dangling relation remains.
+
+#### Graph view behavior
+- Switch between list, table, and graph views.
+- Confirm the graph reflects the current query, search, and folder scope.
+- Confirm each paper appears as one node and attachments are excluded.
+- Confirm node size grows with the number of related papers.
+- Confirm edge direction follows publication time ordering.
+- Confirm node colors follow top-level folder families, with shade variations for subfolders.
+- Confirm click, double-click, hover, zoom, pan, and reset behaviors work correctly.
+
+#### Regression checks
+- Edit tags and confirm tags still work independently from folders.
+- Restart the app and confirm folders, relations, and graph data remain consistent.
+- Run a full typecheck before submitting changes:
+
+```bash
+pnpm run typecheck
+```
+
+### 5. Optional packaging smoke test
+
+If you want to verify that the app still packages locally on macOS Apple Silicon:
+
+```bash
+pnpm run build-mac-arm-dev
+```
+
+Use the platform-specific build scripts in `package.json` for other targets.
+
 ## Donate
 
 <a href="https://www.buymeacoffee.com/geoffreychen777" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>

@@ -80,6 +80,95 @@
 [介绍（英文）](https://paperlib.app/en/doc/getting-started.html)  
 [介绍（中文）](https://paperlib.app/cn/doc/getting-started.html)
 
+## 本 Fork 的本地测试说明
+
+这个 fork 新增了类似 Obsidian 的本地文件夹工作流、论文关联关系以及论文图谱视图。以下步骤用于本地开发过程中的人工测试。
+
+### 1. 准备开发环境
+
+- 安装 Node.js 20.14+。
+- 安装 pnpm。
+- 安装依赖：
+
+```bash
+pnpm install
+```
+
+### 2. 以开发模式启动应用
+
+```bash
+pnpm run dev
+```
+
+这会启动 Electron 应用，并让 renderer 处于 watch 模式。
+
+### 3. 推荐的本地测试目录
+
+开始测试前，建议先在本机准备一个干净的本地论文库目录，例如：
+
+```text
+~/Paperlib-Test-Library/
+  RL/
+    Exploration/
+    Reward-Shaping/
+  LLM/
+    Agents/
+    RAG/
+  Robot/
+    Manipulation/
+```
+
+然后把若干 PDF 导入不同文件夹，以便验证：
+- 顶层文件夹颜色家族是否正确区分（例如 RL / LLM / Robot）
+- 同一颜色家族下，不同子文件夹的色阶微调是否合理
+- 递归文件夹浏览行为是否正确
+- 图谱节点大小与边方向是否正确
+
+### 4. 人工测试清单
+
+#### 文件夹结构行为
+- 在 app 内创建文件夹，确认真实本地目录被创建。
+- 重命名文件夹，确认真实本地目录也被重命名。
+- 移动文件夹，确认真实本地目录也被移动。
+- 删除空文件夹，确认真实本地目录被删除。
+- 验证非空文件夹删除会被阻止，并给出明确反馈。
+- 选择父文件夹时，确认会包含其所有子文件夹中的论文。
+- 将论文拖入另一个文件夹后，确认其受管理的本地路径已更新。
+
+#### 关联论文行为
+- 打开某篇论文的详情面板并添加关联论文。
+- 确认关联关系会在两篇论文上都显示出来。
+- 删除关联关系，确认两侧都同步消失。
+- 删除存在关联关系的论文，确认不会留下悬空关系。
+
+#### 图谱视图行为
+- 在 list、table、graph 视图之间切换。
+- 确认 graph 视图会正确反映当前 query、搜索条件和文件夹范围。
+- 确认每篇论文对应一个节点，附件不会进入图谱。
+- 确认节点大小会随关联论文数量增加而变大。
+- 确认边方向遵循发表时间顺序。
+- 确认节点颜色按照顶层文件夹色系分组，并根据子文件夹做色阶变化。
+- 确认点击、双击、悬停、缩放、平移、重置等交互都能正常工作。
+
+#### 回归检查
+- 编辑 tags，确认 tags 仍然独立于 folders 正常工作。
+- 重启 app，确认 folders、relations、graph 数据仍然一致。
+- 在提交代码前运行完整类型检查：
+
+```bash
+pnpm run typecheck
+```
+
+### 5. 可选的本地打包冒烟测试
+
+如果你想验证应用在 macOS Apple Silicon 上仍能本地打包，可运行：
+
+```bash
+pnpm run build-mac-arm-dev
+```
+
+其他平台请使用 `package.json` 中对应的构建脚本。
+
 ## 捐赠
 
 <a href="https://www.buymeacoffee.com/geoffreychen777" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="请我喝咖啡" height="41" width="174"></a>
