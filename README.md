@@ -87,17 +87,31 @@ See [here](https://paperlib.app/en/download-linux.html).
 
 ## Local Testing for This Fork
 
-This fork adds an Obsidian-style local-folder workflow, paper relations, and a paper graph view. The steps below are intended for local manual testing during development.
+This fork adds an Obsidian-style local-folder workflow, paper relations, and a paper graph view. The steps below are intended for local manual testing during development and for testing the feature branch on another machine.
 
-### 1. Prepare the development environment
+### 1. Get the branch and install dependencies
 
-- Install Node.js 20.14+.
-- Install pnpm.
-- Install dependencies:
+If you are testing on another machine, clone your fork and switch to this branch first:
 
 ```bash
+git clone git@github.com:SakuraToErii/paperlib.git
+cd paperlib
+git checkout feat/obsidian-folder-graph
 pnpm install
 ```
+
+If you already have the repository locally:
+
+```bash
+git fetch origin
+git checkout feat/obsidian-folder-graph
+git pull
+pnpm install
+```
+
+Requirements:
+- Node.js 20.14+
+- pnpm
 
 ### 2. Start the app in development mode
 
@@ -145,6 +159,7 @@ Import several PDFs into different folders so that you can verify:
 - Confirm the relation is visible from both papers.
 - Remove a relation and confirm it disappears from both sides.
 - Delete a paper that has relations and confirm no dangling relation remains.
+- If available in your current UI flow, try batch relate / batch unrelate from multiple selected papers.
 
 #### Graph view behavior
 - Switch between list, table, and graph views.
@@ -153,7 +168,7 @@ Import several PDFs into different folders so that you can verify:
 - Confirm node size grows with the number of related papers.
 - Confirm edge direction follows publication time ordering.
 - Confirm node colors follow top-level folder families, with shade variations for subfolders.
-- Confirm click, double-click, hover, zoom, pan, and reset behaviors work correctly.
+- Confirm click, double-click, hover, zoom, pan, focus-selected, neighborhood mode, back-to-whole-graph, and reset behaviors work correctly.
 
 #### Regression checks
 - Edit tags and confirm tags still work independently from folders.
@@ -164,7 +179,20 @@ Import several PDFs into different folders so that you can verify:
 pnpm run typecheck
 ```
 
-### 5. Optional packaging smoke test
+### 5. Optional targeted tests
+
+These tests are useful if you want to quickly validate the core semantics before or after manual testing:
+
+```bash
+pnpm vitest run \
+  tests/unit-tests/base/folder.spec.ts \
+  tests/unit-tests/renderer/paper-graph.spec.ts \
+  tests/unit-tests/renderer/paper-graph-view.spec.ts \
+  tests/unit-tests/services/paper-relations.spec.ts \
+  tests/unit-tests/services/sync-service.spec.ts
+```
+
+### 6. Optional packaging smoke test
 
 If you want to verify that the app still packages locally on macOS Apple Silicon:
 
