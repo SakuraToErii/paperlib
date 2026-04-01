@@ -117,6 +117,31 @@ export class SyncService extends Eventable<ISyncServiceState> {
     this._setStoreValue(key, _DEFAULTSTATE[key]);
   }
 
+  private _getLatestSyncTimestamp(logs: z.infer<typeof SyncLog>[]) {
+    return logs.reduce((latestTimestamp, log) => {
+      if (!log?.timestamp) {
+        return latestTimestamp;
+      }
+
+      if (!latestTimestamp) {
+        return log.timestamp;
+      }
+
+      const logTimestamp = new Date(log.timestamp).getTime();
+      const currentLatestTimestamp = new Date(latestTimestamp).getTime();
+
+      if (Number.isNaN(logTimestamp)) {
+        return latestTimestamp;
+      }
+
+      if (Number.isNaN(currentLatestTimestamp) || logTimestamp > currentLatestTimestamp) {
+        return log.timestamp;
+      }
+
+      return latestTimestamp;
+    }, "");
+  }
+
   /**
    * Ensure _openidClientConfig is loaded, if not, perform discovery.
    * Avoid writing repeated if (!this._openidClientConfig) {...} in multiple places.
@@ -409,6 +434,7 @@ export class SyncService extends Eventable<ISyncServiceState> {
     const localLogs = this._getStoreValue("syncLogs") || [];
 
     const remoteLogs = getResponse.data || [];
+    const latestRemoteTimestamp = this._getLatestSyncTimestamp(remoteLogs);
     // Filter out logs that have already been pushed locally
     const filteredLogs = remoteLogs.filter(
       // 1. local log_id is different from remote log_id
@@ -513,8 +539,23 @@ export class SyncService extends Eventable<ISyncServiceState> {
       synced = true;
     }
 
-    if (synced) {
-      this._setStoreValue("lastSyncAt", new Date().toISOString());
+    let nextLastSyncAt = lastSyncAt;
+    if (latestRemoteTimestamp) {
+      nextLastSyncAt = latestRemoteTimestamp;
+    }
+    if (localLogs.length > 0) {
+      const latestLocalTimestamp = this._getLatestSyncTimestamp(localLogs);
+      if (
+        latestLocalTimestamp &&
+        (!nextLastSyncAt ||
+          new Date(latestLocalTimestamp).getTime() > new Date(nextLastSyncAt).getTime())
+      ) {
+        nextLastSyncAt = latestLocalTimestamp;
+      }
+    }
+
+    if (nextLastSyncAt && nextLastSyncAt !== lastSyncAt) {
+      this._setStoreValue("lastSyncAt", nextLastSyncAt);
     }
   }
 
