@@ -1,8 +1,60 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { Entity } from "../../../app/models/entity";
 import { ScrapeService } from "../../../app/service/services/scrape-service";
 
 describe("ScrapeService PaperEntity bypass compatibility", () => {
+  it("rehydrates metadata hook results so title formatting stays intact after hook recovery", async () => {
+    const beforeMetadataResult = {
+      _id: "507f1f77bcf86cd799439011",
+      title: "Recovered <math><mi>x</mi></math> title",
+      authors: "Test Author",
+      year: "2024",
+      supplementaries: {},
+      tags: [],
+      folders: [],
+    };
+
+    const hookService = {
+      hasHook: vi.fn((hookName: string) => {
+        if (hookName === "beforeScrapeMetadata") {
+          return "modify";
+        }
+        return false;
+      }),
+      modifyHookPoint: vi.fn(async (...args: any[]) => {
+        if (args[0] === "beforeScrapeMetadata") {
+          return [[beforeMetadataResult], args[3], args[4]];
+        }
+        return args.slice(2);
+      }),
+      transformhookPoint: vi.fn(async () => []),
+    };
+
+    const logService = {
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+      progress: vi.fn(),
+    };
+
+    const service = new ScrapeService(hookService as any, logService as any);
+    const seedEntity = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Seed Title",
+      authors: "Seed Author",
+      year: "2024",
+      supplementaries: {},
+      tags: [],
+      folders: [],
+    });
+
+    const [result] = await service.scrapeMetadata([seedEntity], [], false);
+
+    expect(result).toBeInstanceOf(Entity);
+    expect(result.title).toBe(beforeMetadataResult.title);
+  });
+
   it("bypasses scrapeEntry hooks for PaperEntity payloads that already contain entity drafts", async () => {
     const hookService = {
       hasHook: vi.fn((hookName: string) => {

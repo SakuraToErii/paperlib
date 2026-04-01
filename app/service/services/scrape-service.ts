@@ -246,6 +246,8 @@ export class ScrapeService extends Eventable<{}> {
     scrapers: string[],
     force: boolean = false
   ) {
+    const rehydrateEntities = (drafts: Entity[]) => drafts.map((draft) => new Entity(draft));
+
     if (this._hookService.hasHook("beforeScrapeMetadata")) {
       [paperEntityDrafts, scrapers, force] =
         await this._hookService.modifyHookPoint(
@@ -255,6 +257,7 @@ export class ScrapeService extends Eventable<{}> {
           scrapers,
           force
         );
+      paperEntityDrafts = rehydrateEntities(paperEntityDrafts);
     }
 
     let scrapedPaperEntityDrafts = paperEntityDrafts;
@@ -267,6 +270,7 @@ export class ScrapeService extends Eventable<{}> {
           scrapers,
           force
         );
+      scrapedPaperEntityDrafts = rehydrateEntities(scrapedPaperEntityDrafts);
     }
 
     if (this._hookService.hasHook("afterScrapeMetadata")) {
@@ -278,6 +282,7 @@ export class ScrapeService extends Eventable<{}> {
           scrapers,
           force
         );
+      scrapedPaperEntityDrafts = rehydrateEntities(scrapedPaperEntityDrafts);
     }
 
     return scrapedPaperEntityDrafts;
