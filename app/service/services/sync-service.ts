@@ -458,6 +458,14 @@ export class SyncService extends Eventable<ISyncServiceState> {
         case "paper":
           switch (log.operation) {
             case "update":
+              if (logValue.relatedPaperUpdate) {
+                await PLAPILocal.paperService.setRelatedPaperIds(
+                  logValue.relatedPaperUpdate.paperId,
+                  logValue.relatedPaperUpdate.relatedIds,
+                  true
+                );
+                break;
+              }
               await PLAPILocal.paperService.update(
                 logValue.paperEntityDrafts,
                 logValue.updateCache,
