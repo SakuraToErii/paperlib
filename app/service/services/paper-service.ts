@@ -53,6 +53,36 @@ export const IPaperService = createDecorator("paperService");
  * Service for paper entity operations.
  */
 export class PaperService extends Eventable<IPaperServiceState> {
+  private _normalizeExistingRelatedIds(relatedIds: OID[] | undefined, selfId: string) {
+    return Array.from(
+      new Set(
+        (relatedIds || [])
+          .map((id) => `${id}`)
+          .filter((id) => ObjectId.isValid(id) && id !== selfId)
+      )
+    );
+  }
+
+  private _buildRelatedObjectIds(relatedIds: string[]) {
+    return relatedIds.map((id) => new ObjectId(id)) as any;
+  }
+
+  private _syncPaperRelationIds(
+    paper: Entity,
+    nextRelatedIds: Iterable<string>
+  ) {
+    const normalizedPaperId = `${paper._id}`;
+    const normalizedRelatedIds = Array.from(
+      new Set(
+        Array.from(nextRelatedIds).filter(
+          (id) => ObjectId.isValid(id) && id !== normalizedPaperId
+        )
+      )
+    );
+
+    paper.relatedPaperIds = this._buildRelatedObjectIds(normalizedRelatedIds);
+  }
+
   constructor(
     @IDatabaseCore private readonly _databaseCore: DatabaseCore,
     @IPaperEntityRepository
@@ -633,35 +663,25 @@ export class PaperService extends Eventable<IPaperServiceState> {
       const existingRelatedPapers = Array.from(
         this._paperEntityRepository.loadByIds(realm, requestedRelatedIds)
       ) as Entity[];
-      const existingRelatedIds = new Set(
-        existingRelatedPapers.map((paper) => `${paper._id}`)
-      );
-      const normalizedRelatedIds = requestedRelatedIds.filter((id) =>
-        existingRelatedIds.has(id)
+      const normalizedRelatedIds = existingRelatedPapers.map((paper) => `${paper._id}`);
+      const nextRelatedIdSet = new Set(normalizedRelatedIds);
+      const previouslyRelatedIds = new Set(
+        this._normalizeExistingRelatedIds(targetPaper.relatedPaperIds as any, normalizedPaperId)
       );
 
-      const previouslyRelatedIds = new Set(
-        (targetPaper.relatedPaperIds || []).map((id) => `${id}`)
-      );
-      targetPaper.relatedPaperIds = normalizedRelatedIds.map(
-        (id) => new ObjectId(id)
-      ) as any;
+      this._syncPaperRelationIds(targetPaper, normalizedRelatedIds);
 
       for (const relatedPaper of existingRelatedPapers) {
         const relatedPaperId = `${relatedPaper._id}`;
-        if (!existingRelatedIds.has(relatedPaperId)) {
-          continue;
-        }
-        const nextIds = new Set((relatedPaper.relatedPaperIds || []).map((id) => `${id}`));
-        nextIds.delete(relatedPaperId);
+        const nextIds = new Set(
+          this._normalizeExistingRelatedIds(relatedPaper.relatedPaperIds as any, relatedPaperId)
+        );
         nextIds.add(normalizedPaperId);
-        relatedPaper.relatedPaperIds = Array.from(nextIds)
-          .filter((id) => ObjectId.isValid(id) && id !== relatedPaperId)
-          .map((id) => new ObjectId(id)) as any;
+        this._syncPaperRelationIds(relatedPaper, nextIds);
       }
 
       for (const previouslyRelatedId of previouslyRelatedIds) {
-        if (normalizedRelatedIds.includes(previouslyRelatedId)) {
+        if (nextRelatedIdSet.has(previouslyRelatedId)) {
           continue;
         }
 
@@ -669,9 +689,97 @@ export class PaperService extends Eventable<IPaperServiceState> {
         if (!relatedPaper) {
           continue;
         }
-        relatedPaper.relatedPaperIds = (relatedPaper.relatedPaperIds || [])
-          .filter((id) => `${id}` !== normalizedPaperId && `${id}` !== `${relatedPaper._id}`)
-          .map((id) => new ObjectId(id)) as any;
+
+        const nextIds = new Set(
+          this._normalizeExistingRelatedIds(relatedPaper.relatedPaperIds as any, `${relatedPaper._id}`)
+        );
+        nextIds.delete(normalizedPaperId);
+        this._syncPaperRelationIds(relatedPaper, nextIds);
+      }
+    });
+  }
+
+  @processing(ProcessingKey.General)
+  @errorcatching("Failed to batch update related papers.", true, "PaperService")
+  async setBatchRelatedPaperIds(paperIds: OID[], fromSync: boolean = false) {
+    const normalizedPaperIds = Array.from(
+      new Set(paperIds.map((id) => `${id}`).filter((id) => ObjectId.isValid(id)))
+    );
+
+    if (normalizedPaperIds.length === 0) {
+      return;
+    }
+
+    if (!fromSync) {
+      await PLAPILocal.syncService.addSyncLog("paper", "update", {
+        relatedPaperBatchUpdate: {
+          paperIds: normalizedPaperIds,
+          action: "relate",
+        },
+      });
+    }
+
+    const realm = await this._databaseCore.realm();
+
+    realm.safeWrite(() => {
+      const targetPapers = Array.from(
+        this._paperEntityRepository.loadByIds(realm, normalizedPaperIds)
+      ) as Entity[];
+      const existingPaperIds = targetPapers.map((paper) => `${paper._id}`);
+
+      for (const paper of targetPapers) {
+        const paperId = `${paper._id}`;
+        const nextIds = new Set(
+          this._normalizeExistingRelatedIds(paper.relatedPaperIds as any, paperId)
+        );
+
+        for (const relatedPaperId of existingPaperIds) {
+          if (relatedPaperId !== paperId) {
+            nextIds.add(relatedPaperId);
+          }
+        }
+
+        this._syncPaperRelationIds(paper, nextIds);
+      }
+    });
+  }
+
+  @processing(ProcessingKey.General)
+  @errorcatching("Failed to batch remove related papers.", true, "PaperService")
+  async removeBatchRelatedPaperIds(paperIds: OID[], fromSync: boolean = false) {
+    const normalizedPaperIds = Array.from(
+      new Set(paperIds.map((id) => `${id}`).filter((id) => ObjectId.isValid(id)))
+    );
+
+    if (normalizedPaperIds.length === 0) {
+      return;
+    }
+
+    if (!fromSync) {
+      await PLAPILocal.syncService.addSyncLog("paper", "update", {
+        relatedPaperBatchUpdate: {
+          paperIds: normalizedPaperIds,
+          action: "unrelate",
+        },
+      });
+    }
+
+    const realm = await this._databaseCore.realm();
+
+    realm.safeWrite(() => {
+      const targetPapers = Array.from(
+        this._paperEntityRepository.loadByIds(realm, normalizedPaperIds)
+      ) as Entity[];
+      const targetPaperIdSet = new Set(targetPapers.map((paper) => `${paper._id}`));
+
+      for (const paper of targetPapers) {
+        const paperId = `${paper._id}`;
+        const nextIds = this._normalizeExistingRelatedIds(
+          paper.relatedPaperIds as any,
+          paperId
+        ).filter((relatedPaperId) => !targetPaperIdSet.has(relatedPaperId));
+
+        this._syncPaperRelationIds(paper, nextIds);
       }
     });
   }

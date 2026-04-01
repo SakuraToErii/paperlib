@@ -219,4 +219,60 @@ describe("PaperService relations", () => {
     expect(relatedIdsOf(papers, paperC)).toEqual([paperA]);
     expect(repository.delete).toHaveBeenCalled();
   });
+
+  it("batch relate creates a clique across the selected papers without disturbing outside links", async () => {
+    const paperA = "507f1f77bcf86cd799439061";
+    const paperB = "507f1f77bcf86cd799439062";
+    const paperC = "507f1f77bcf86cd799439063";
+    const paperD = "507f1f77bcf86cd799439064";
+
+    const { service, papers } = createHarness([
+      createPaper(paperA, [paperD]),
+      createPaper(paperB, [paperD]),
+      createPaper(paperC),
+      createPaper(paperD, [paperA, paperB]),
+    ]);
+
+    await service.setBatchRelatedPaperIds([
+      paperA,
+      paperB,
+      paperC,
+      paperA,
+      "not-an-object-id",
+      "507f1f77bcf86cd7994390ff",
+    ] as any);
+
+    expect(relatedIdsOf(papers, paperA)).toEqual([paperD, paperB, paperC]);
+    expect(relatedIdsOf(papers, paperB)).toEqual([paperD, paperA, paperC]);
+    expect(relatedIdsOf(papers, paperC)).toEqual([paperA, paperB]);
+    expect(relatedIdsOf(papers, paperD)).toEqual([paperA, paperB]);
+  });
+
+  it("batch unrelate removes only intra-selection edges and preserves outside links", async () => {
+    const paperA = "507f1f77bcf86cd799439071";
+    const paperB = "507f1f77bcf86cd799439072";
+    const paperC = "507f1f77bcf86cd799439073";
+    const paperD = "507f1f77bcf86cd799439074";
+
+    const { service, papers } = createHarness([
+      createPaper(paperA, [paperB, paperC, paperD]),
+      createPaper(paperB, [paperA, paperC, paperD]),
+      createPaper(paperC, [paperA, paperB]),
+      createPaper(paperD, [paperA, paperB]),
+    ]);
+
+    await service.removeBatchRelatedPaperIds([
+      paperA,
+      paperB,
+      paperC,
+      paperA,
+      "not-an-object-id",
+      "507f1f77bcf86cd7994390ff",
+    ] as any);
+
+    expect(relatedIdsOf(papers, paperA)).toEqual([paperD]);
+    expect(relatedIdsOf(papers, paperB)).toEqual([paperD]);
+    expect(relatedIdsOf(papers, paperC)).toEqual([]);
+    expect(relatedIdsOf(papers, paperD)).toEqual([paperA, paperB]);
+  });
 });
