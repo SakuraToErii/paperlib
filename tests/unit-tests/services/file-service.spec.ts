@@ -76,10 +76,10 @@ describe("FileService.move", () => {
 
     expect(moveFile).toHaveBeenCalledWith(
       "file:///Users/testuser/Downloads/Deep Learning Survey.pdf",
-      "Users/testuser/Downloads/Deep Learning Survey_main.pdf"
+      "Folder/Deep Learning Survey_main.pdf"
     );
     expect(paperEntity.supplementaries.main.url).toBe(
-      "file://Users/testuser/Downloads/Deep Learning Survey_main.pdf"
+      "file://Folder/Deep Learning Survey_main.pdf"
     );
   });
 
