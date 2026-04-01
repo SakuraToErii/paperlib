@@ -4,7 +4,7 @@
     "library": "文獻庫",
     "feeds": "訂閱",
     "tags": "標籤",
-    "folders": "檔案夾",
+    "folders": "資料夾",
     "allpapers": "所有文獻",
     "flag": "標記",
     "flags": "標記",
@@ -45,7 +45,13 @@
     "feed": "訂閱",
     "feedTime": "更新時間",
     "abstract": "摘要",
-    "foundcandidates": "找到候選匹配"
+    "foundcandidates": "找到候選匹配",
+    "graph": "圖譜",
+    "graphlegend": "資料夾顏色圖例",
+    "relatedpapers": "關聯論文",
+    "searchrelatedpapers": "搜尋要關聯的論文...",
+    "norelatedpapers": "目前沒有關聯論文。",
+    "nopapersgraph": "目前沒有可顯示在圖譜中的論文。"
   },
   "smartfilter": {
     "startops": "起始運算子",
@@ -116,7 +122,9 @@
     "save": "保存",
     "advanced": "進階",
     "choose": "選擇",
-    "locate": "定位"
+    "locate": "定位",
+    "graphview": "圖譜視圖",
+    "graphfit": "適配圖譜"
   },
   "preference": {
     "general": "通用",
@@ -221,7 +229,9 @@
     "hotkeysDuplicateKeysInfo": "快捷鍵已被佔用",
     "hotkeysOpenPDFLabel": "打開 PDF",
     "hotkeysEditLabel": "編輯元數據",
-    "hotkeysPluginLabel": "打開快捷搜索"
+    "hotkeysPluginLabel": "打開快捷搜索",
+    "graphpalette": "圖譜配色",
+    "graphpaletteintro": "可選，以逗號分隔的十六進位色碼，用於自訂圖譜頂層資料夾色系。"
   },
   "confirmation": {
     "title": "確認",
@@ -231,8 +241,8 @@
   },
   "plugin": {
     "searchinpaperlib": "在 Paperlib 中搜索",
-    "linkfolder": "鏈接資料夾",
-    "newfolder": "新建資料夾",
+    "linkfolder": "連結資料夾",
+    "newfolder": "新增資料夾",
     "singleref": "單個引用",
     "allref": "全部引用",
     "citekey": "引用鍵"

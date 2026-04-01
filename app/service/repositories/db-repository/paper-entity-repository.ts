@@ -144,6 +144,9 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
     paperEntity.rating = paperEntity.rating || 0;
     paperEntity.tags = paperEntity.tags || [];
     paperEntity.folders = paperEntity.folders || [];
+    paperEntity.relatedPaperIds = Array.from(
+      new Set((paperEntity.relatedPaperIds || []).map((id) => `${id}`))
+    ).map((id) => new ObjectId(id));
     paperEntity.flag = paperEntity.flag || false;
 
     return paperEntity;
@@ -245,6 +248,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
         object.rating = paperEntity.rating;
         object.tags = tags;
         object.folders = folders;
+        object.relatedPaperIds = paperEntity.relatedPaperIds;
         object.flag = paperEntity.flag;
         object.note = paperEntity.note;
 
@@ -276,6 +280,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
         if (object) {
           object.tags = tags;
           object.folders = folders;
+          object.relatedPaperIds = paperEntity.relatedPaperIds;
         }
 
         this._categorizerRepository.updateCount(
@@ -316,6 +321,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
         const toBeDeleted = realm
           .objects<Entity>("Entity")
           .filtered(`(${idsQuery})`);
+        const deletedIdSet = new Set(toBeDeleted.map((paperEntity) => `${paperEntity._id}`));
 
         const toBeDeletedFiles = toBeDeleted
           .map((paperEntity) => {
@@ -347,6 +353,16 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
               toBeUpdatedFolders.push(folderObject);
             }
           }
+        }
+
+        for (const paperEntity of realm.objects<Entity>("Entity")) {
+          if (deletedIdSet.has(`${paperEntity._id}`)) {
+            continue;
+          }
+
+          paperEntity.relatedPaperIds = paperEntity.relatedPaperIds.filter(
+            (relatedPaperId) => !deletedIdSet.has(`${relatedPaperId}`)
+          );
         }
 
         realm.delete(toBeDeleted);

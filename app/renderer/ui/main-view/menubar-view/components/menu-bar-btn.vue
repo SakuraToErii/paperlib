@@ -2,6 +2,7 @@
 import {
   BIconArrowCounterclockwise,
   BIconAspectRatio,
+  BIconCollection,
   BIconFlag,
   BIconGear,
   BIconGrid3x2,
@@ -36,6 +37,7 @@ const btnIcons: Record<string, any> = {
   tableview: BIconGrid3x2,
   preference: BIconGear,
   tablereaderview: BIconAspectRatio,
+  graphview: BIconCollection,
 };
 </script>
 

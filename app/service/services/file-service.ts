@@ -1,5 +1,5 @@
 import { SpawnOptions, spawn } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, promises as fsPromise } from "fs";
 import os from "os";
 import path, { isAbsolute } from "path";
 
@@ -11,9 +11,17 @@ import {
   eraseProtocol,
   getFileType,
   getProtocol,
+  getRelativePath,
   hasProtocol,
   listAllFiles,
 } from "@/base/url";
+import {
+  getFolderPathFromRelativeFile,
+  getParentFolderPath,
+  isInternalLibraryPath,
+  joinFolderPath,
+  normalizeFolderPath,
+} from "@/base/folder";
 import { ILogService, LogService } from "@/common/services/log-service";
 
 import { IFileBackend } from "../repositories/file-repository/backend";
@@ -142,6 +150,180 @@ export class FileService extends Eventable<IFileServiceState> {
     return await this._backend?.check();
   }
 
+  async libraryFolder() {
+    return (await PLMainAPI.preferenceService.get("appLibFolder")) as string;
+  }
+
+  async usesLocalFileSystem() {
+    return (
+      ((await PLMainAPI.preferenceService.get("syncFileStorage")) as string) ===
+      "local"
+    );
+  }
+
+  getEntityFolderPath(paperEntity: Entity) {
+    return normalizeFolderPath(
+      paperEntity.folders
+        .map((folder) => folder.name)
+        .sort((left, right) => right.length - left.length)[0] || ""
+    );
+  }
+
+  async createFolder(relativeFolderPath: string) {
+    const normalizedFolderPath = normalizeFolderPath(relativeFolderPath);
+    if (!normalizedFolderPath) {
+      return;
+    }
+
+    await fsPromise.mkdir(
+      path.join(await this.libraryFolder(), normalizedFolderPath),
+      { recursive: true }
+    );
+  }
+
+  async renameFolder(sourceRelativeFolderPath: string, targetRelativeFolderPath: string) {
+    const normalizedSource = normalizeFolderPath(sourceRelativeFolderPath);
+    const normalizedTarget = normalizeFolderPath(targetRelativeFolderPath);
+
+    if (!normalizedSource || normalizedSource === normalizedTarget) {
+      return;
+    }
+
+    await this.createFolder(getParentFolderPath(normalizedTarget));
+    await fsPromise.rename(
+      path.join(await this.libraryFolder(), normalizedSource),
+      path.join(await this.libraryFolder(), normalizedTarget)
+    );
+  }
+
+  async deleteEmptyFolder(relativeFolderPath: string) {
+    const normalizedFolderPath = normalizeFolderPath(relativeFolderPath);
+    if (!normalizedFolderPath) {
+      return;
+    }
+
+    const absoluteFolderPath = path.join(
+      await this.libraryFolder(),
+      normalizedFolderPath
+    );
+    const children = await fsPromise.readdir(absoluteFolderPath);
+    if (children.length > 0) {
+      throw new Error("Only empty folders can be deleted.");
+    }
+
+    await fsPromise.rmdir(absoluteFolderPath);
+  }
+
+  async listLibraryFolders() {
+    const libraryFolder = await this.libraryFolder();
+    const folders = new Set<string>();
+
+    const visit = async (absoluteFolderPath: string) => {
+      const items = await fsPromise.readdir(absoluteFolderPath, {
+        withFileTypes: true,
+      });
+
+      for (const item of items) {
+        const absoluteItemPath = path.join(absoluteFolderPath, item.name);
+        const relativeItemPath = getRelativePath(absoluteItemPath, libraryFolder);
+
+        if (isInternalLibraryPath(relativeItemPath)) {
+          continue;
+        }
+
+        if (item.isDirectory()) {
+          const normalizedFolderPath = normalizeFolderPath(relativeItemPath);
+          if (normalizedFolderPath) {
+            folders.add(normalizedFolderPath);
+          }
+          await visit(absoluteItemPath);
+        }
+      }
+    };
+
+    if (existsSync(libraryFolder)) {
+      await visit(libraryFolder);
+    }
+
+    return Array.from(folders).sort((left, right) => {
+      const leftDepth = left.split("/").length;
+      const rightDepth = right.split("/").length;
+      if (leftDepth !== rightDepth) {
+        return leftDepth - rightDepth;
+      }
+      return left.localeCompare(right);
+    });
+  }
+
+  getManagedRelativePath(fileURL: string, libraryFolder: string) {
+    if (getProtocol(fileURL) !== "file") {
+      return "";
+    }
+
+    const rawPath = eraseProtocol(fileURL);
+    if (!rawPath) {
+      return "";
+    }
+
+    const relativePath = path.isAbsolute(rawPath)
+      ? getRelativePath(rawPath, libraryFolder)
+      : normalizeFolderPath(rawPath);
+    const normalizedRelativePath = normalizeFolderPath(relativePath);
+
+    if (
+      !normalizedRelativePath ||
+      normalizedRelativePath === ".." ||
+      normalizedRelativePath.startsWith("../") ||
+      isInternalLibraryPath(normalizedRelativePath)
+    ) {
+      return "";
+    }
+
+    return normalizedRelativePath;
+  }
+
+  remapManagedFileURL(
+    fileURL: string,
+    sourceRelativeFolderPath: string,
+    targetRelativeFolderPath: string,
+    libraryFolder: string
+  ) {
+    const normalizedSourceFolderPath = normalizeFolderPath(sourceRelativeFolderPath);
+    const normalizedTargetFolderPath = normalizeFolderPath(targetRelativeFolderPath);
+    const relativePath = this.getManagedRelativePath(fileURL, libraryFolder);
+
+    if (
+      !normalizedSourceFolderPath ||
+      !relativePath ||
+      !relativePath.startsWith(`${normalizedSourceFolderPath}/`)
+    ) {
+      return fileURL;
+    }
+
+    const suffix = relativePath.slice(normalizedSourceFolderPath.length + 1);
+    return constructFileURL(
+      joinFolderPath(normalizedTargetFolderPath, suffix),
+      false,
+      true,
+      "",
+      "file://"
+    );
+  }
+
+  getLeafFolderFromEntityFiles(paperEntity: Entity, libraryFolder: string) {
+    const localFileSup = Object.values(paperEntity.supplementaries).find((sup) => {
+      return !!this.getManagedRelativePath(sup.url, libraryFolder);
+    });
+
+    if (!localFileSup) {
+      return this.getEntityFolderPath(paperEntity);
+    }
+
+    return getFolderPathFromRelativeFile(
+      this.getManagedRelativePath(localFileSup.url, libraryFolder)
+    );
+  }
+
   /**
    * Infer the relative path of a paper entity.
    * @param paperEntity - Paper entity to infer the relative path
@@ -218,6 +400,7 @@ export class FileService extends Eventable<IFileServiceState> {
 
     formatedFilename = formatedFilename
       .replace(/\\/g, "/")
+      .replace(/\//g, "_")
       .replace(/[*?"<>|:#\\]/g, "");
     return formatedFilename;
   }
@@ -236,7 +419,8 @@ export class FileService extends Eventable<IFileServiceState> {
 
     try {
       const formatedFilename = await this.inferRelativeFileName(paperEntity);
-      
+      const folderPath = this.getEntityFolderPath(paperEntity);
+
       for (const [id, sup] of Object.entries(paperEntity.supplementaries)) {
         if (getProtocol(sup.url) !== "file") {
           continue;
@@ -244,7 +428,10 @@ export class FileService extends Eventable<IFileServiceState> {
 
         const movedFilename = await backend.moveFile(
           sup.url,
-          `${formatedFilename}_${sup._id}${path.extname(sup.url)}`
+          joinFolderPath(
+            folderPath,
+            `${formatedFilename}_${sup._id}${path.extname(sup.url)}`
+          )
         );
         sup.url = constructFileURL(
           movedFilename,

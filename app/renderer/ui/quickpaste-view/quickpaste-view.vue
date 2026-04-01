@@ -9,8 +9,9 @@ import { Ref, nextTick, onMounted, ref } from "vue";
 
 import { disposable } from "@/base/dispose";
 import { debounce } from "@/base/misc";
+import { getPublicationString } from "@/base/string";
 import { CategorizerType, PaperFolder } from "@/models/categorizer";
-import { PaperEntity } from "@/models/paper-entity";
+import { Entity } from "@/models/entity";
 import { PaperFilterOptions } from "@/base/filter";
 import { cmdOrCtrl } from "@/base/shortcut";
 
@@ -19,8 +20,34 @@ import TableItem from "./components/table-item.vue";
 // ====================
 // Data
 // ====================
-const paperEntities: Ref<PaperEntity[]> = ref([]);
+type SearchShortcutItem = {
+  id: "search-in-google-scholar";
+  title: string;
+  authors?: string;
+  year?: string;
+  publication?: string;
+};
+
+type QuickpasteItem = Entity | SearchShortcutItem;
+
+const paperEntities: Ref<QuickpasteItem[]> = ref([]);
 const folders: Ref<PaperFolder[]> = ref([]);
+
+const isSearchShortcutItem = (
+  item?: QuickpasteItem
+): item is SearchShortcutItem => {
+  return !!item && "id" in item && item.id === "search-in-google-scholar";
+};
+
+const getQuickpasteItemYear = (item: QuickpasteItem) => {
+  return isSearchShortcutItem(item) ? item.year || "" : item.year || "";
+};
+
+const getQuickpasteItemPublication = (item: QuickpasteItem) => {
+  return isSearchShortcutItem(item)
+    ? item.publication || ""
+    : getPublicationString(item);
+};
 
 // ====================
 // State
@@ -50,9 +77,8 @@ const onSearchTextChanged = debounce(async () => {
       }).toString(),
       mainviewSortBy.value,
       mainviewSortOrder.value
-    )) as PaperEntity[];
+    )) as Entity[];
 
-    // @ts-ignore
     paperEntities.value.push({
       id: "search-in-google-scholar",
       title: "Search in Google Scholar...",
@@ -77,16 +103,16 @@ const onSearchTextChanged = debounce(async () => {
 
 const exportSelectedCiteKeys = async () => {
   const selectedEntity = paperEntities.value[selectedIndex.value];
-  if (selectedEntity && selectedEntity.id === "search-in-google-scholar") {
+  if (isSearchShortcutItem(selectedEntity)) {
     await PLAPI.fileService.open(
       `https://scholar.google.com/scholar?q=${searchText.value}`
     );
-  } else {
+  } else if (selectedEntity) {
     await PLAPI.referenceService.export([selectedEntity] as any, "BibTex-Key");
 
     if (linkedFolder.value) {
       await PLAPI.paperService.updateWithCategorizer(
-        [`${selectedEntity.id}`],
+        [`${selectedEntity._id}`],
         new PaperFolder({ name: linkedFolder.value }),
         CategorizerType.PaperFolder
       );
@@ -104,11 +130,11 @@ const exportSelectedCiteKeys = async () => {
 
 const exportSelectedCiteBodies = async () => {
   const selectedEntity = paperEntities.value[selectedIndex.value];
-  if (selectedEntity && selectedEntity.id === "search-in-google-scholar") {
+  if (isSearchShortcutItem(selectedEntity)) {
     await PLAPI.fileService.open(
       `https://scholar.google.com/scholar?q=${searchText.value}`
     );
-  } else {
+  } else if (selectedEntity) {
     await PLAPI.referenceService.export(
       [selectedEntity] as any,
       exportMode.value
@@ -116,7 +142,7 @@ const exportSelectedCiteBodies = async () => {
 
     if (linkedFolder.value) {
       await PLAPI.paperService.updateWithCategorizer(
-        [`${selectedEntity.id}`],
+        [`${selectedEntity._id}`],
         new PaperFolder({ name: linkedFolder.value }),
         CategorizerType.PaperFolder
       );
@@ -134,14 +160,14 @@ const exportSelectedCiteBodies = async () => {
 
 const exportSelectedCiteBodiesInFolder = async () => {
   const selectedEntity = paperEntities.value[selectedIndex.value];
-  if (selectedEntity && selectedEntity.id === "search-in-google-scholar") {
+  if (isSearchShortcutItem(selectedEntity)) {
     await PLAPI.fileService.open(
       `https://scholar.google.com/scholar?q=${searchText.value}`
     );
   } else {
-    if (linkedFolder.value && selectedEntity) {
+    if (linkedFolder.value && selectedEntity && !isSearchShortcutItem(selectedEntity)) {
       await PLAPI.paperService.updateWithCategorizer(
-        [`${selectedEntity.id}`],
+        [`${selectedEntity._id}`],
         new PaperFolder({ name: linkedFolder.value }),
         CategorizerType.PaperFolder
       );
@@ -386,8 +412,8 @@ onMounted(() => {
           v-for="(item, index) in paperEntities"
           :title="item.title"
           :authors="item.authors"
-          :year="item.pubTime"
-          :publication="item.publication"
+          :year="getQuickpasteItemYear(item)"
+          :publication="getQuickpasteItemPublication(item)"
           :active="selectedIndex == index"
           class="h-[28px]"
           @click="() => {}"

@@ -62,6 +62,7 @@ export interface IEntity {
   rating?: number;
   tags: ICategorizerDraft[];
   folders: ICategorizerDraft[];
+  relatedPaperIds?: OID[];
   flag?: boolean;
   note?: string;
 
@@ -116,6 +117,10 @@ export class Entity implements IEntity {
         type: "list",
         objectType: "PaperFolder",
       },
+      relatedPaperIds: {
+        type: "list",
+        objectType: "objectId",
+      },
       flag: "bool?",
       note: "string?",
 
@@ -157,6 +162,7 @@ export class Entity implements IEntity {
   rating?: number;
   tags!: PaperTag[];
   folders!: PaperFolder[];
+  relatedPaperIds!: OID[];
   flag?: boolean;
   note?: string;
   read?: boolean;
@@ -250,6 +256,7 @@ export class Entity implements IEntity {
     this.tags = object?.tags?.map((tag) => new PaperTag(tag, false)) || [];
     this.folders =
       object?.folders?.map((folder) => new PaperFolder(folder, false)) || [];
+    this.relatedPaperIds = object?.relatedPaperIds?.map((id) => new ObjectId(id)) || [];
     this.flag = object?.flag;
     this.note = object?.note;
 
@@ -300,6 +307,7 @@ export type IEntityRealmObject = Entity &
     | "rating"
     | "tags"
     | "folders"
+    | "relatedPaperIds"
     | "flag"
     | "note"
     | "read"

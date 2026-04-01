@@ -77,6 +77,7 @@ export interface IPreferenceStore {
   mainviewSortOrder: "desc" | "asce";
   mainviewType: string;
   mainviewShortAuthor: boolean;
+  graphColorPalette: string;
 
   pluginLinkedFolder: string;
 

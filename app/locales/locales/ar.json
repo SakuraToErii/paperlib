@@ -44,7 +44,13 @@
     "historyreleasenote": "مذكرة تاريخ النشر",
     "feed": "المستجدات",
     "feedTime": "وقت التغذية",
-    "abstract": "الخلاصة"
+    "abstract": "الخلاصة",
+    "graph": "الرسم البياني",
+    "graphlegend": "دليل ألوان المجلدات",
+    "relatedpapers": "الأوراق المرتبطة",
+    "searchrelatedpapers": "ابحث عن أوراق لربطها...",
+    "norelatedpapers": "لا توجد أوراق مرتبطة بعد.",
+    "nopapersgraph": "لا توجد أوراق لعرضها في الرسم البياني."
   },
   "smartfilter": {
     "startops": "إبدأ العمليات",
@@ -113,7 +119,9 @@
     "save": "حفظ",
     "advanced": "متقدم",
     "choose": "إختر",
-    "locate": "حدد"
+    "locate": "حدد",
+    "graphview": "عرض الرسم البياني",
+    "graphfit": "ملاءمة الرسم البياني"
   },
   "preference": {
     "general": "عام",
@@ -218,7 +226,9 @@
     "hotkeysDuplicateKeysInfo": "هذا الاختصار مستخدم بالفعل بواسطة اختصار آخر.",
     "hotkeysOpenPDFLabel": "إفتح PDF",
     "hotkeysEditLabel": "عدل البيانات الوصفية",
-    "hotkeysPluginLabel": "افتح البرنامج المساعد المرجعي السريع"
+    "hotkeysPluginLabel": "افتح البرنامج المساعد المرجعي السريع",
+    "graphpalette": "لوحة ألوان الرسم البياني",
+    "graphpaletteintro": "ألوان hex اختيارية مفصولة بفواصل لتخصيص عائلات ألوان مجلدات المستوى الأعلى في الرسم البياني."
   },
   "confirmation": {
     "title": "تأكيد",

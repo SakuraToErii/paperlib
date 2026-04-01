@@ -4,7 +4,7 @@
     "library": "文献库",
     "feeds": "订阅",
     "tags": "标签",
-    "folders": "组",
+    "folders": "文件夹",
     "allpapers": "所有文献",
     "flag": "标记",
     "flags": "标记",
@@ -49,7 +49,13 @@
     "feed": "订阅",
     "feedTime": "更新时间",
     "abstract": "摘要",
-    "foundcandidates": "找到候选匹配"
+    "foundcandidates": "找到候选匹配",
+    "graph": "图谱",
+    "graphlegend": "文件夹颜色图例",
+    "relatedpapers": "关联论文",
+    "searchrelatedpapers": "搜索要关联的论文...",
+    "norelatedpapers": "暂时没有关联论文。",
+    "nopapersgraph": "当前没有可显示在图谱中的论文。"
   },
   "smartfilter": {
     "startops": "起始运算符",
@@ -73,8 +79,8 @@
     "in": "在 ... 之中",
     "tagname": "标签名称",
     "tagcount": "标签包含论文数量",
-    "foldername": "组名称",
-    "foldercount": "组包含论文数量"
+    "foldername": "文件夹名称",
+    "foldercount": "文件夹包含论文数量"
   },
   "menu": {
     "rescrape": "搜寻元数据",
@@ -120,7 +126,9 @@
     "save": "保存",
     "advanced": "高级",
     "choose": "选择",
-    "locate": "搜寻"
+    "locate": "搜寻",
+    "graphview": "图谱视图",
+    "graphfit": "适配图谱"
   },
   "preference": {
     "general": "通用",
@@ -225,7 +233,9 @@
     "hotkeysDuplicateKeysInfo": "快捷键已经被占用",
     "hotkeysOpenPDFLabel": "打开 PDF",
     "hotkeysEditLabel": "编辑元数据",
-    "hotkeysPluginLabel": "打开快捷搜索"
+    "hotkeysPluginLabel": "打开快捷搜索",
+    "graphpalette": "图谱配色",
+    "graphpaletteintro": "可选，使用逗号分隔的十六进制颜色，用于自定义图谱顶层文件夹颜色族。"
   },
   "confirmation": {
     "title": "确认",
@@ -235,8 +245,8 @@
   },
   "plugin": {
     "searchinpaperlib": "在 Paperlib 中搜索",
-    "linkfolder": "链接组",
-    "newfolder": "新建组",
+    "linkfolder": "链接文件夹",
+    "newfolder": "新建文件夹",
     "singleref": "单个引用",
     "allref": "所有引用",
     "citekey": "引用键"

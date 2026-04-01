@@ -9,10 +9,12 @@ import {
   ICategorizerCollection,
   ICategorizerObject,
   ICategorizerRealmObject,
+  PaperFolder,
   PaperTag,
 } from "@/models/categorizer";
 import { OID } from "@/models/id";
 import { Entity } from "@/models/entity";
+import { escapeRealmString } from "@/base/folder";
 
 export interface ICategorizerRepositoryState {
   tagsUpdated: number;
@@ -194,7 +196,7 @@ export class CategorizerRepository extends Eventable<ICategorizerRepositoryState
       if (folders.length === 0) {
         realm.create<Categorizer>(
           CategorizerType.PaperFolder,
-          new PaperTag(
+          new PaperFolder(
             {
               _partition: partation,
               name: "Folders",
@@ -416,10 +418,21 @@ export class CategorizerRepository extends Eventable<ICategorizerRepositoryState
       ) as ICategorizerRealmObject[];
 
       categorizerRealmObjects.forEach((categorizer) => {
-        categorizer.count = categorizer.linkingObjects<Entity>(
-          Entity.schema.name,
-          type === CategorizerType.PaperTag ? "tags" : "folders"
-        ).length;
+        if (type === CategorizerType.PaperTag) {
+          categorizer.count = categorizer.linkingObjects<Entity>(
+            Entity.schema.name,
+            "tags"
+          ).length;
+          return;
+        }
+
+        const escapedFolderName = escapeRealmString(categorizer.name);
+        const escapedPrefix = escapeRealmString(`${categorizer.name}/`);
+        categorizer.count = realm
+          .objects<Entity>(Entity.schema.name)
+          .filtered(
+            `library == 'main' AND ((ANY folders.name == "${escapedFolderName}") OR (ANY folders.name BEGINSWITH "${escapedPrefix}"))`
+          ).length;
       });
     });
   }

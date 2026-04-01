@@ -82,6 +82,7 @@ export interface IPreferenceStore {
   mainviewSortOrder: "desc" | "asce";
   mainviewType: string;
   mainviewShortAuthor: boolean;
+  graphColorPalette: string;
 
   pluginLinkedFolder: string;
 
@@ -203,6 +204,7 @@ const _defaultPreferences: IPreferenceStore = {
   mainviewSortOrder: "desc",
   mainviewType: "list",
   mainviewShortAuthor: false,
+  graphColorPalette: "",
 
   pluginLinkedFolder: "",
 
@@ -326,6 +328,12 @@ function _migrate(
     store.set("feedFields", feedFields);
   }
   // TODO: migrate from 1 to 2
+
+  for (const key of Object.keys(_defaultPreferences)) {
+    if (!store.has(key)) {
+      store.set(key, _defaultPreferences[key as keyof IPreferenceStore]);
+    }
+  }
 
   store.set("preferenceVersion", preferenceVersion);
 

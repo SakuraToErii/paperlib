@@ -22,6 +22,7 @@ export interface IMenuServiceState {
   "Edit-edit": number;
   "Edit-flag": number;
   "View-preview": number;
+  "View-graph": number;
   "View-next": number;
   "View-previous": number;
   "File-delete": number;
@@ -46,6 +47,7 @@ export class MenuService extends Eventable<IMenuServiceState> {
       "Edit-edit": 0,
       "Edit-flag": 0,
       "View-preview": 0,
+      "View-graph": 0,
       "View-next": 0,
       "View-previous": 0,
       "File-delete": 0,
@@ -176,6 +178,12 @@ export class MenuService extends Eventable<IMenuServiceState> {
             label: this._locales.t("menu.preview"),
             click: () => {
               this.fire("View-preview");
+            },
+          },
+          {
+            label: this._locales.t("menu.graphview"),
+            click: () => {
+              this.fire("View-graph");
             },
           },
           {

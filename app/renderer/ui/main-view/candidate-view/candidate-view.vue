@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { PaperEntity } from "@/models/paper-entity";
+import { getPublicationString } from "@/base/string";
+import { Entity } from "@/models/entity";
 import { PropType, ref } from "vue";
 
 const props = defineProps({
@@ -8,7 +9,7 @@ const props = defineProps({
     required: true,
   },
   candidates: {
-    type: Object as PropType<PaperEntity[]>,
+    type: Object as PropType<Entity[]>,
     required: true,
     default: [],
   },
@@ -24,20 +25,20 @@ const selectIdx = ref<number>(0);
 // Event handlers
 // ================================
 const onConfirmClicked = async () => {
-  const paperEntityDraft = new PaperEntity(props.candidates[selectIdx.value]);
-  const currentEntityDraft = (await PLAPI.paperService.loadByIds([props.id]))[0] as PaperEntity;
+  const paperEntityDraft = new Entity(props.candidates[selectIdx.value]);
+  const currentEntityDraft = (await PLAPI.paperService.loadByIds([props.id]))[0] as Entity;
 
   if (currentEntityDraft) {
-    paperEntityDraft.id = currentEntityDraft.id;
-    paperEntityDraft.mainURL = currentEntityDraft.mainURL;
+    paperEntityDraft._id = currentEntityDraft._id;
     paperEntityDraft.addTime = currentEntityDraft.addTime;
     paperEntityDraft._partition = currentEntityDraft._partition;
-    paperEntityDraft.codes = currentEntityDraft.codes;
     paperEntityDraft.tags = currentEntityDraft.tags;
     paperEntityDraft.folders = currentEntityDraft.folders;
+    paperEntityDraft.relatedPaperIds = currentEntityDraft.relatedPaperIds;
     paperEntityDraft.flag = currentEntityDraft.flag;
     paperEntityDraft.rating = currentEntityDraft.rating;
-    paperEntityDraft.supURLs = currentEntityDraft.supURLs;
+    paperEntityDraft.supplementaries = currentEntityDraft.supplementaries;
+    paperEntityDraft.defaultSup = currentEntityDraft.defaultSup;
     paperEntityDraft.note = currentEntityDraft.note;
 
     PLAPI.paperService.update([paperEntityDraft], false, true);
@@ -85,11 +86,11 @@ const onCancelClicked = () => {
           class="text-[0.7rem] leading-[0.9rem] text-neutral-400 flex space-x-2"
           :class="selectIdx === idx ? 'text-neutral-300' : ''"
         >
-          <div>{{ candidate.pubTime }}</div>
+          <div>{{ candidate.year }}</div>
           <div class="flex space-x-2 text-ellipsis overflow-hidden shrink">
             <div>|</div>
             <div class="italic truncate">
-              {{ candidate.publication }}
+              {{ getPublicationString(candidate) }}
             </div>
           </div>
         </div>

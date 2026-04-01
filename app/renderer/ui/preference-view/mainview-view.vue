@@ -9,6 +9,7 @@ import PaperListItem from "@/renderer/ui/main-view/data-view/components/list-vie
 import TableItem from "@/renderer/ui/main-view/data-view/components/table-view/components/table-item.vue";
 import { FieldTemplate } from "@/renderer/types/data-view";
 
+import Input from "./components/Input.vue";
 import Toggle from "./components/toggle.vue";
 import MainField from "./components/main-field.vue";
 
@@ -219,6 +220,17 @@ const updatePref = (key: string, value: unknown) => {
       :info="$t('preference.mainviewshortauthor')"
       :enable="prefState.mainviewShortAuthor"
       @event:change="(value) => updatePref('mainviewShortAuthor', value)"
+    />
+
+    <Input
+      class="mt-5"
+      :title="$t('preference.graphpalette')"
+      :info="$t('preference.graphpaletteintro')"
+      :value="prefState.graphColorPalette"
+      type="text"
+      placeholder="#10b981,#3b82f6,#f59e0b"
+      @event:submit="(value) => updatePref('graphColorPalette', value)"
+      @event:change="() => {}"
     />
 
     <br />

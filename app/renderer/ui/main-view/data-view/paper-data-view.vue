@@ -9,6 +9,7 @@ import { CategorizerMenuItem, CategorizerType } from "@/models/categorizer";
 import { FieldTemplate } from "@/renderer/types/data-view";
 import { IEntityCollection } from "@/models/entity";
 
+import PaperGraphView from "./components/graph-view/paper-graph-view.vue";
 import ListView from "./components/list-view/list-view.vue";
 import TablePreviewView from "./components/table-view/table-preview-view.vue";
 import TableView from "./components/table-view/table-view.vue";
@@ -340,6 +341,16 @@ onMounted(() => {
       @event:drag="onItemDraged"
       @event:drag-file="onItemFileDraged"
       @event:click-candidate-btn="onCandidateButtonClicked"
+    />
+    <PaperGraphView
+      id="graph-data-view"
+      class="w-full max-h-[calc(100vh-4rem)]"
+      v-else-if="prefState.mainviewType === 'graph'"
+      :entities="paperEntities"
+      :selected-index="uiState.selectedIndex"
+      :graph-palette="prefState.graphColorPalette"
+      @event:click="onItemClicked"
+      @event:dblclick="onItemDoubleClicked"
     />
     <TableView
       id="table-data-view"

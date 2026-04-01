@@ -9,6 +9,7 @@ import Categorizers from "./components/categorizers.vue";
 import Markdown from "./components/markdown.vue";
 import PubDetails from "./components/pub-details.vue";
 import Rating from "./components/rating.vue";
+import RelatedPapers from "./components/related-papers.vue";
 import Section from "./components/section.vue";
 import Supplementaries from "./components/supplementary.vue";
 import Thumbnail from "./components/thumbnail.vue";
@@ -309,6 +310,9 @@ onUpdated(() => {
       </Section>
       <Section :title="$t('mainview.rating')">
         <Rating :rating="entity.rating || 0" @event:change="onRatingChanged" />
+      </Section>
+      <Section :title="$t('mainview.relatedpapers')">
+        <RelatedPapers :entity="entity" />
       </Section>
 
       <Section

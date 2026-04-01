@@ -45,7 +45,13 @@
     "feed": "Feed",
     "feedTime": "Feed Zeit",
     "abstract": "Abstract",
-    "foundcandidates": "Gefundene Kandidaten"
+    "foundcandidates": "Gefundene Kandidaten",
+    "graph": "Graph",
+    "graphlegend": "Ordner-Farblegende",
+    "relatedpapers": "Verknüpfte Arbeiten",
+    "searchrelatedpapers": "Arbeiten zum Verknüpfen suchen...",
+    "norelatedpapers": "Noch keine verknüpften Arbeiten.",
+    "nopapersgraph": "Keine Arbeiten für den Graphen vorhanden."
   },
   "smartfilter": {
     "startops": "Start Ops",
@@ -71,8 +77,7 @@
     "tagcount": "Anzahl Paper mit Schlagwort",
     "foldername": "Ordner Name",
     "foldercount": "Anzahl Paper im Ordner"
-  }
-  ,
+  },
   "menu": {
     "rescrape": "Scrape",
     "rescrapefrom": "Daten Scrapen von",
@@ -117,7 +122,9 @@
     "save": "Speichern",
     "advanced": "Erweitert",
     "choose": "Auswählen",
-    "locate": "Hervorheben"
+    "locate": "Hervorheben",
+    "graphview": "Graph-Ansicht",
+    "graphfit": "Graph anpassen"
   },
   "preference": {
     "general": "Generell",
@@ -222,7 +229,9 @@
     "hotkeysDuplicateKeysInfo": "Dieses Tastenkürzel wird woanders schon verwendet.",
     "hotkeysOpenPDFLabel": "PDF öffnen",
     "hotkeysEditLabel": "Metadaten bearbeiten",
-    "hotkeysPluginLabel": "Quick Reference Plugin öffnen"
+    "hotkeysPluginLabel": "Quick Reference Plugin öffnen",
+    "graphpalette": "Graph-Palette",
+    "graphpaletteintro": "Optionale, komma-getrennte Hex-Farben für die Farbgruppen der obersten Ordner im Graphen."
   },
   "confirmation": {
     "title": "Bestätigung",

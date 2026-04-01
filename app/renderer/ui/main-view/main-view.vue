@@ -487,6 +487,9 @@ const onMenuButtonClicked = (command: string) => {
     case "tableandpreview-view":
       switchViewType("tableandpreview");
       break;
+    case "graph-view":
+      switchViewType("graph");
+      break;
     case "sort-by-title":
     case "sort-by-authors":
     case "sort-by-addTime":
@@ -532,7 +535,10 @@ const onArrowDownPressed = () => {
 const fixScrolling = (index: number) => {
   const currentElement = dataView.value?.querySelector(
     `#item-${index}`
-  ) as HTMLElement;
+  ) as HTMLElement | null;
+  if (!currentElement) {
+    return;
+  }
   currentElement.scrollIntoView({
     behavior: "smooth",
     block: "end",
@@ -680,6 +686,12 @@ disposable(
 disposable(
   PLMainAPI.menuService.onClick("View-preview", () => {
     previewSelectedEntities();
+  })
+);
+
+disposable(
+  PLMainAPI.menuService.onClick("View-graph", () => {
+    switchViewType("graph");
   })
 );
 

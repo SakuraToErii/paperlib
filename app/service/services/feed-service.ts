@@ -13,7 +13,7 @@ import {
   IFeedEntityObject,
 } from "@/models/feed-entity";
 import { OID } from "@/models/id";
-import { PaperEntity } from "@/models/paper-entity";
+import { Entity } from "@/models/entity";
 import { DatabaseCore, IDatabaseCore } from "@/service/services/database/core";
 
 import {
@@ -401,11 +401,24 @@ export class FeedService extends Eventable<IFeedServiceState> {
 
     const paperEntityDrafts = feedEntities.map(
       (feedEntityDraft: IFeedEntityObject) => {
-        const paperEntityDraft = new PaperEntity({}, true).fromFeed(
-          feedEntityDraft
+        const paperEntityDraft = new Entity(
+          {
+            title: feedEntityDraft.title,
+            authors: feedEntityDraft.authors,
+            abstract: feedEntityDraft.abstract,
+            journal: feedEntityDraft.publication,
+            year: feedEntityDraft.pubTime,
+            doi: feedEntityDraft.doi,
+            arxiv: feedEntityDraft.arxiv,
+            pages: feedEntityDraft.pages,
+            volume: feedEntityDraft.volume,
+            number: feedEntityDraft.number,
+            publisher: feedEntityDraft.publisher,
+          },
+          true
         );
         // NOTE: we don't want to download the PDFs when adding to library.
-        paperEntityDraft.mainURL = "";
+        paperEntityDraft.defaultSup = undefined;
         return paperEntityDraft;
       }
     );

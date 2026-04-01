@@ -1,3 +1,4 @@
+import { ObjectId } from "bson";
 import { chunkRun } from "@/base/chunk";
 import { errorcatching } from "@/base/error";
 import { Eventable } from "@/base/event";
@@ -23,6 +24,7 @@ import {
   PaperEntityRepository,
 } from "../repositories/db-repository/paper-entity-repository";
 import { CacheService, ICacheService } from "./cache-service";
+import { CategorizerService, ICategorizerService } from "./categorizer-service";
 import { FileService, IFileService } from "./file-service";
 import { ISchedulerService, SchedulerService } from "./scheduler-service";
 import { IScrapeService, ScrapeService } from "./scrape-service";
@@ -45,6 +47,8 @@ export class PaperService extends Eventable<IPaperServiceState> {
     @IScrapeService private readonly _scrapeService: ScrapeService,
     @ICacheService private readonly _cacheService: CacheService,
     @ISchedulerService private readonly _schedulerService: SchedulerService,
+    @ICategorizerService
+    private readonly _categorizerService: CategorizerService,
     @IFileService private readonly _fileService: FileService,
     @ILogService private readonly _logService: LogService
   ) {
@@ -274,6 +278,8 @@ export class PaperService extends Eventable<IPaperServiceState> {
       this._cacheService.updateFullTextCache(successfulEntityDrafts);
     }
 
+    await this._categorizerService.syncFoldersWithLibrary();
+
     return successfulEntityDrafts;
   }
 
@@ -313,11 +319,7 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
         paperEntityDraft.tags.push(new PaperTag(categorizer));
       } else if (type === CategorizerType.PaperFolder) {
-        paperEntityDraft.folders = paperEntityDraft.folders
-          .filter((folder) => `${folder._id}` !== `${categorizer._id}`)
-          .filter((folder) => folder.name !== categorizer.name);
-
-        paperEntityDraft.folders.push(new PaperFolder(categorizer));
+        paperEntityDraft.folders = [new PaperFolder(categorizer)];
       }
 
       return paperEntityDraft;
@@ -532,12 +534,62 @@ export class PaperService extends Eventable<IPaperServiceState> {
         if (type === CategorizerType.PaperTag) {
           paperEntityDraft.tags.push(new PaperTag(categorizer));
         } else if (type === CategorizerType.PaperFolder) {
-          paperEntityDraft.folders.push(new PaperFolder(categorizer));
+          paperEntityDraft.folders = [new PaperFolder(categorizer)];
         }
         return paperEntityDraft;
       }
     );
     return await this.update(toBeUpdatedPaperEntityDrafts, false, true);
+  }
+
+  @processing(ProcessingKey.General)
+  @errorcatching("Failed to update related papers.", true, "PaperService")
+  async setRelatedPaperIds(paperId: OID, relatedIds: OID[]) {
+    const realm = await this._databaseCore.realm();
+    const normalizedPaperId = `${paperId}`;
+    const normalizedRelatedIds = Array.from(
+      new Set(relatedIds.map((id) => `${id}`).filter((id) => id !== normalizedPaperId))
+    );
+
+    realm.safeWrite(() => {
+      const targetPaper = this._paperEntityRepository.loadByIds(realm, [paperId])[0] as Entity;
+      if (!targetPaper) {
+        throw new Error(`Paper not found: ${paperId}`);
+      }
+
+      const previouslyRelatedIds = new Set(
+        (targetPaper.relatedPaperIds || []).map((id) => `${id}`)
+      );
+      targetPaper.relatedPaperIds = normalizedRelatedIds.map(
+        (id) => new ObjectId(id)
+      ) as any;
+
+      for (const relatedId of normalizedRelatedIds) {
+        const relatedPaper = this._paperEntityRepository.loadByIds(realm, [relatedId])[0] as Entity;
+        if (!relatedPaper) {
+          continue;
+        }
+        const nextIds = new Set((relatedPaper.relatedPaperIds || []).map((id) => `${id}`));
+        nextIds.add(normalizedPaperId);
+        relatedPaper.relatedPaperIds = Array.from(nextIds).map(
+          (id) => new ObjectId(id)
+        ) as any;
+      }
+
+      for (const previouslyRelatedId of previouslyRelatedIds) {
+        if (normalizedRelatedIds.includes(previouslyRelatedId)) {
+          continue;
+        }
+
+        const relatedPaper = this._paperEntityRepository.loadByIds(realm, [previouslyRelatedId])[0] as Entity;
+        if (!relatedPaper) {
+          continue;
+        }
+        relatedPaper.relatedPaperIds = (relatedPaper.relatedPaperIds || [])
+          .filter((id) => `${id}` !== normalizedPaperId)
+          .map((id) => new ObjectId(id)) as any;
+      }
+    });
   }
 
   /**

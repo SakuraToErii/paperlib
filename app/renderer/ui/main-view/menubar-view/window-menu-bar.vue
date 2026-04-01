@@ -6,6 +6,7 @@ import {
   BIconCalendar3,
   BIconCheck2,
   BIconClock,
+  BIconCollection,
   BIconDash,
   BIconFilterRight,
   BIconFonts,
@@ -136,6 +137,12 @@ disposable(
           class="my-auto"
           btnName="tablereaderview"
           @event:click="emits('event:click', 'tableandpreview-view')"
+        />
+        <MenuBarBtn
+          id="graph-view-btn"
+          class="my-auto"
+          btnName="graphview"
+          @event:click="emits('event:click', 'graph-view')"
         />
       </div>
 
@@ -361,6 +368,23 @@ disposable(
                   <BIconCheck2
                     class="my-auto"
                     v-if="prefState.mainviewType === 'tableandpreview'"
+                  />
+                </div>
+              </MenuItem>
+              <MenuItem
+                id="graph-view-btn-win"
+                v-slot="{ active }"
+                class="w-full rounded-md p-1 hover:bg-neutral-200 hover:dark:bg-neutral-700"
+                @click="emits('event:click', 'graph-view')"
+              >
+                <div class="flex justify-between px-2">
+                  <div class="flex space-x-2">
+                    <BIconCollection class="my-auto" />
+                    <span>{{ $t("menu.graphview") }}</span>
+                  </div>
+                  <BIconCheck2
+                    class="my-auto"
+                    v-if="prefState.mainviewType === 'graph'"
                   />
                 </div>
               </MenuItem>

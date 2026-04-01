@@ -1,6 +1,7 @@
 import { DirectedGraph } from "graphology";
 
 import { errorcatching } from "@/base/error";
+import { getFolderPrefixQuery } from "@/base/folder";
 import { createDecorator } from "@/base/injection/injection";
 import { CategorizerType, ICategorizerCollection } from "@/models/categorizer";
 import { OID } from "@/models/id";
@@ -51,7 +52,7 @@ export class QuerySentenceService {
       if (type === CategorizerType.PaperTag) {
         node["query"] = `tags.name == "${obj.name}"`;
       } else if (type === CategorizerType.PaperFolder) {
-        node["query"] = `folders.name == "${obj.name}"`;
+        node["query"] = getFolderPrefixQuery(obj.name);
         if (obj.name === linkedFolderName) {
           node["icon"] = "folder-link";
         }
