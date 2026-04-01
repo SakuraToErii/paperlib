@@ -20,6 +20,11 @@ export interface PaperGraphEdge {
   target: string;
 }
 
+export interface PaperGraphData {
+  nodes: PaperGraphNode[];
+  edges: PaperGraphEdge[];
+}
+
 const DEFAULT_PALETTE = [
   "#10b981",
   "#3b82f6",
@@ -245,6 +250,54 @@ const buildShadeVariants = (entities: Entity[]) => {
 
     return accumulator;
   }, {} as Record<string, string[]>);
+};
+
+const buildNeighborhoodNodeIdSet = (
+  graph: PaperGraphData,
+  selectedPaperId?: string
+) => {
+  if (!selectedPaperId) {
+    return new Set<string>();
+  }
+
+  const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  if (!nodeIds.has(selectedPaperId)) {
+    return new Set<string>();
+  }
+
+  const neighborhoodNodeIds = new Set<string>([selectedPaperId]);
+
+  for (const edge of graph.edges) {
+    if (edge.source === selectedPaperId && nodeIds.has(edge.target)) {
+      neighborhoodNodeIds.add(edge.target);
+    }
+
+    if (edge.target === selectedPaperId && nodeIds.has(edge.source)) {
+      neighborhoodNodeIds.add(edge.source);
+    }
+  }
+
+  return neighborhoodNodeIds;
+};
+
+export const getPaperGraphNeighborhood = (
+  graph: PaperGraphData,
+  selectedPaperId?: string
+): PaperGraphData => {
+  const neighborhoodNodeIds = buildNeighborhoodNodeIdSet(graph, selectedPaperId);
+  if (neighborhoodNodeIds.size === 0) {
+    return {
+      nodes: [...graph.nodes],
+      edges: [...graph.edges],
+    };
+  }
+
+  return {
+    nodes: graph.nodes.filter((node) => neighborhoodNodeIds.has(node.id)),
+    edges: graph.edges.filter((edge) => {
+      return neighborhoodNodeIds.has(edge.source) && neighborhoodNodeIds.has(edge.target);
+    }),
+  };
 };
 
 export const buildPaperGraph = (entities: Entity[], customPalette?: string) => {
