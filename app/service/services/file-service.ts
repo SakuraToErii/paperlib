@@ -433,10 +433,14 @@ export class FileService extends Eventable<IFileServiceState> {
     paperEntity: Entity,
   ): Promise<Entity> {
     const backend = await this.backend();
+    const libraryFolder = await this.libraryFolder();
 
     try {
       const formatedFilename = await this.inferRelativeFileName(paperEntity);
-      const folderPath = this.getEntityFolderPath(paperEntity);
+      const folderPath = this.getLeafFolderFromEntityFiles(
+        paperEntity,
+        libraryFolder
+      );
 
       for (const [id, sup] of Object.entries(paperEntity.supplementaries)) {
         if (getProtocol(sup.url) !== "file") {
@@ -460,7 +464,7 @@ export class FileService extends Eventable<IFileServiceState> {
       }
 
       for (const id of Object.keys(paperEntity.supplementaries)) {
-        if (getProtocol(paperEntity.supplementaries[id].url) === "file" && path.isAbsolute(paperEntity.supplementaries[id].url)) {
+        if (getProtocol(paperEntity.supplementaries[id].url) === "file" && path.isAbsolute(eraseProtocol(paperEntity.supplementaries[id].url))) {
           this._logService.warn(
             `The file ${paperEntity.supplementaries[id].url} cannot be moved to the library folder.`,
             "",

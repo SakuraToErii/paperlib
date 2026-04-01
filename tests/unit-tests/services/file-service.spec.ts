@@ -5,6 +5,9 @@ vi.mock("../../../app/base/url", () => ({
   eraseProtocol: vi.fn((value: string) => value.replace(/^file:\/\//, "")),
   getFileType: vi.fn(() => "pdf"),
   getProtocol: vi.fn((value: string) => {
+    if (value.startsWith("file://") || value.startsWith("file:///")) {
+      return "file";
+    }
     const match = /^([a-zA-Z]+):/.exec(value);
     return match?.[1] || "";
   }),
@@ -16,7 +19,9 @@ vi.mock("../../../app/base/url", () => ({
 }));
 
 vi.mock("../../../app/base/folder", () => ({
-  getFolderPathFromRelativeFile: vi.fn(),
+  getFolderPathFromRelativeFile: vi.fn((value: string) =>
+    value.split("/").slice(0, -1).join("/")
+  ),
   getParentFolderPath: vi.fn(),
   isInternalLibraryPath: vi.fn(() => false),
   joinFolderPath: vi.fn((...segments: string[]) =>
@@ -28,9 +33,19 @@ vi.mock("../../../app/base/folder", () => ({
 describe("FileService.move", () => {
   beforeEach(() => {
     vi.resetModules();
+    globalThis.PLMainAPI = {
+      preferenceService: {
+        get: vi.fn(async (key: string) => {
+          if (key === "appLibFolder") {
+            return "/Users/testuser/Paperlib";
+          }
+          return "";
+        }),
+      },
+    };
   });
 
-  it("uses the original source URL when renaming an already imported file", async () => {
+  it("imports external files into the library folder and updates the stored URL", async () => {
     const { FileService } = await import("../../../app/service/services/file-service");
     const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
       warn: vi.fn(),
@@ -40,8 +55,47 @@ describe("FileService.move", () => {
 
     const moveFile = vi.fn(async (_sourceURL: string, targetURL: string) => targetURL);
     vi.spyOn(service, "backend").mockResolvedValue({ moveFile } as any);
+    vi.spyOn(service, "libraryFolder").mockResolvedValue("/library");
+    vi.spyOn(service, "inferRelativeFileName").mockResolvedValue("Deep Learning Survey");
+    vi.spyOn(service, "getEntityFolderPath").mockReturnValue("Folder");
+
+    const paperEntity = {
+      title: "Deep Learning Survey",
+      folders: [{ name: "Folder" }],
+      supplementaries: {
+        main: {
+          _id: "main",
+          url: "file:///Users/testuser/Downloads/Deep Learning Survey.pdf",
+        },
+      },
+    } as any;
+
+    vi.spyOn(service, "getLeafFolderFromEntityFiles").mockReturnValue("Folder");
+
+    await service.move(paperEntity);
+
+    expect(moveFile).toHaveBeenCalledWith(
+      "file:///Users/testuser/Downloads/Deep Learning Survey.pdf",
+      "Users/testuser/Downloads/Deep Learning Survey_main.pdf"
+    );
+    expect(paperEntity.supplementaries.main.url).toBe(
+      "file://Users/testuser/Downloads/Deep Learning Survey_main.pdf"
+    );
+  });
+
+  it("uses the original managed folder when renaming an already imported file", async () => {
+    const { FileService } = await import("../../../app/service/services/file-service");
+    const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any);
+
+    const moveFile = vi.fn(async (_sourceURL: string, targetURL: string) => targetURL);
+    vi.spyOn(service, "backend").mockResolvedValue({ moveFile } as any);
+    vi.spyOn(service, "libraryFolder").mockResolvedValue("/library");
     vi.spyOn(service, "inferRelativeFileName").mockResolvedValue("Renamed Title");
-    vi.spyOn(service, "getEntityFolderPath").mockReturnValue("Library");
+    vi.spyOn(service, "getEntityFolderPath").mockReturnValue("Ignored Folder");
 
     const paperEntity = {
       title: "Renamed Title",
