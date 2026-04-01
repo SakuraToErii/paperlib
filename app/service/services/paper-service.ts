@@ -4,6 +4,7 @@ import { errorcatching } from "@/base/error";
 import { Eventable } from "@/base/event";
 import { PaperFilterOptions } from "@/base/filter";
 import { createDecorator } from "@/base/injection/injection";
+import { normalizeFolderPath } from "@/base/folder";
 import { ILogService, LogService } from "@/common/services/log-service";
 import { ProcessingKey, processing } from "@/common/utils/processing";
 import {
@@ -33,6 +34,18 @@ export interface IPaperServiceState {
   count: number;
   updated: number;
 }
+
+const entityHasFolderSemanticChanges = (paperEntity: IEntityObject) => {
+  const assignedFolderPaths = (paperEntity.folders || [])
+    .map((folder) => normalizeFolderPath(folder.name))
+    .filter((folderPath) => folderPath);
+
+  if (assignedFolderPaths.length > 1) {
+    return true;
+  }
+
+  return assignedFolderPaths.some((folderPath) => folderPath.includes("/"));
+};
 
 export const IPaperService = createDecorator("paperService");
 
@@ -278,7 +291,11 @@ export class PaperService extends Eventable<IPaperServiceState> {
       this._cacheService.updateFullTextCache(successfulEntityDrafts);
     }
 
-    await this._categorizerService.syncFoldersWithLibrary();
+    // Only perform a full folder rebuild when draft semantics can affect the
+    // derived folder tree. Metadata-only edits should leave the existing tree intact.
+    if (successfulEntityDrafts.some((paperEntityDraft) => entityHasFolderSemanticChanges(paperEntityDraft))) {
+      await this._categorizerService.syncFoldersWithLibrary();
+    }
 
     return successfulEntityDrafts;
   }

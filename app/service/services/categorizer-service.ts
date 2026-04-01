@@ -7,6 +7,7 @@ import {
   escapeRealmString,
   getParentFolderPath,
   isFolderPathInside,
+  isValidFolderNameSegment,
   joinFolderPath,
   normalizeFolderPath,
 } from "@/base/folder";
@@ -412,12 +413,7 @@ export class CategorizerService extends Eventable<ICategorizerServiceState> {
     categorizer: Categorizer,
     parentCategorizer?: Categorizer
   ) {
-    if (
-      !categorizer.name ||
-      categorizer.name?.includes("/") ||
-      categorizer.name === "Tags" ||
-      categorizer.name === "Folders"
-    ) {
+    if (!isValidFolderNameSegment(categorizer.name)) {
       throw new Error(
         "Invalid name, name cannot be empty, 'Tags', 'Folders', or contain '/'"
       );

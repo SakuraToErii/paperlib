@@ -1,5 +1,6 @@
 import path from "path";
 
+const RESERVED_FOLDER_NAMES = new Set(["Tags", "Folders"]);
 const INTERNAL_FOLDER_NAMES = new Set([
   ".realm.management",
   "cache.realm.management",
@@ -56,6 +57,15 @@ export const joinFolderPath = (...segments: (string | undefined)[]) => {
       .map((segment) => normalizeFolderPath(segment))
       .filter((segment) => segment)
       .join("/")
+  );
+};
+
+export const isValidFolderNameSegment = (folderName?: string) => {
+  const normalized = normalizeFolderPath(folderName);
+  return Boolean(
+    normalized &&
+      !normalized.includes("/") &&
+      !RESERVED_FOLDER_NAMES.has(normalized)
   );
 };
 

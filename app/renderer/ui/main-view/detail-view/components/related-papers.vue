@@ -218,15 +218,15 @@ watch(searchText, () => {
             class="shrink-0 rounded-md border border-transparent px-2 py-1 text-[0.65rem] text-neutral-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500 disabled:cursor-not-allowed disabled:opacity-60 dark:text-neutral-500 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400"
             :disabled="syncing"
             @click="removeRelatedPaper(relatedEntity)"
-      >
-        <div
-          v-if="searching"
-          class="px-3 py-2 text-[0.65rem] text-neutral-400 dark:text-neutral-500"
-        >
-          Searching papers…
+          >
+            <span v-if="syncing && pendingRelatedPaperId === `${relatedEntity._id}`">
+              Removing…
+            </span>
+            <span v-else>Remove</span>
+          </button>
         </div>
-
-        <div v-else-if="hasSearchResults" class="max-h-56 overflow-auto p-1">
+      </div>
+    </div>
 
     <div class="space-y-2 border-t border-neutral-200 pt-2 dark:border-neutral-700">
       <div class="flex items-center justify-between gap-2">
@@ -279,7 +279,7 @@ watch(searchText, () => {
                   v-if="result.authors"
                   class="text-[0.65rem] text-neutral-400 dark:text-neutral-500 truncate"
                 >
-                  {{ result.authors }}
+                  {{ formatAuthors(result.authors) }}
                 </div>
               </div>
               <div class="shrink-0 text-[0.65rem] text-accentlight">

@@ -261,13 +261,20 @@ export const buildPaperGraph = (entities: Entity[], customPalette?: string) => {
   }
 
   for (const entity of entities) {
+    const entityId = `${entity._id}`;
+
     for (const relatedPaperId of entity.relatedPaperIds || []) {
       const relatedEntity = entitiesById[`${relatedPaperId}`];
-      if (!relatedEntity || `${relatedEntity._id}` === `${entity._id}`) {
+      if (!relatedEntity) {
         continue;
       }
 
-      const pair = [`${entity._id}`, `${relatedEntity._id}`].sort();
+      const relatedEntityId = `${relatedEntity._id}`;
+      if (relatedEntityId === entityId) {
+        continue;
+      }
+
+      const pair = [entityId, relatedEntityId].sort();
       const pairId = pair.join("::");
       if (uniqueEdges.has(pairId)) {
         continue;
@@ -284,13 +291,10 @@ export const buildPaperGraph = (entities: Entity[], customPalette?: string) => {
         target: `${newerEntity._id}`,
       });
 
+      relationCounts.set(entityId, (relationCounts.get(entityId) || 0) + 1);
       relationCounts.set(
-        `${entity._id}`,
-        (relationCounts.get(`${entity._id}`) || 0) + 1
-      );
-      relationCounts.set(
-        `${relatedEntity._id}`,
-        (relationCounts.get(`${relatedEntity._id}`) || 0) + 1
+        relatedEntityId,
+        (relationCounts.get(relatedEntityId) || 0) + 1
       );
     }
   }
