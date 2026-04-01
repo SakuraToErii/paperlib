@@ -1,4 +1,5 @@
 import { OID } from "@/models/id";
+import { getFolderPrefixQuery } from "./folder";
 import { formatString } from "./string";
 
 export interface IFeedEntityFilterOptions {
@@ -147,9 +148,10 @@ export class PaperFilterOptions implements IPaperFilterOptions {
       this.filters.push(`(ANY tags.name == \"${this.tag}\")`);
     }
     if (this.folder) {
-      this.filters.push(
-        `((ANY folders.name == \"${this.folder}\") OR (ANY folders.name BEGINSWITH \"${this.folder}/\"))`
-      );
+      const folderQuery = getFolderPrefixQuery(this.folder);
+      if (folderQuery) {
+        this.filters.push(`(${folderQuery})`);
+      }
     }
   }
 

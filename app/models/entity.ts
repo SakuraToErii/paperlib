@@ -43,6 +43,9 @@ export interface IEntity {
   authors: string;
   journal?: string;
   booktitle?: string;
+  publication?: string;
+  pubTime?: string;
+  pubType?: number;
   year: string;
   month?: string;
   volume?: string;
@@ -95,6 +98,9 @@ export class Entity implements IEntity {
       booktitle: "string?",
       year: "string",
       month: "string?",
+      publication: "string?",
+      pubTime: "string?",
+      pubType: "int?",
       volume: "string?",
       number: "string?",
       pages: "string?",
@@ -147,6 +153,9 @@ export class Entity implements IEntity {
   booktitle?: string;
   year!: string;
   month?: string;
+  publication?: string;
+  pubTime?: string;
+  pubType?: number;
   volume?: string;
   number?: string;
   pages?: string;
@@ -239,6 +248,9 @@ export class Entity implements IEntity {
     this.booktitle = object?.booktitle;
     this.year = object?.year || "";
     this.month = object?.month;
+    this.publication = object?.publication || object?.journal || object?.booktitle || "";
+    this.pubTime = object?.pubTime || object?.year || "";
+    this.pubType = object?.pubType;
     this.volume = object?.volume;
     this.number = object?.number;
     this.pages = object?.pages;
