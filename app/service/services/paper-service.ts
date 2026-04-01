@@ -544,7 +544,19 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
   @processing(ProcessingKey.General)
   @errorcatching("Failed to update related papers.", true, "PaperService")
-  async setRelatedPaperIds(paperId: OID, relatedIds: OID[]) {
+  async setRelatedPaperIds(
+    paperId: OID,
+    relatedIds: OID[],
+    fromSync: boolean = false
+  ) {
+    if (!fromSync) {
+      await PLAPILocal.syncService.addSyncLog("paper", "update", {
+        relatedPaperUpdate: {
+          paperId,
+          relatedIds,
+        },
+      });
+    }
     const realm = await this._databaseCore.realm();
     const normalizedPaperId = `${paperId}`;
     const normalizedRelatedIds = Array.from(
