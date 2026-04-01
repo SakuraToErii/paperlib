@@ -31,6 +31,10 @@ const hasSearchFeedback = computed(() => {
   return canSearch.value && (searching.value || hasSearchResults.value || !syncing.value);
 });
 
+const hasSearchResultsMessage = computed(() => {
+  return canSearch.value && !searching.value && !hasSearchResults.value && !syncing.value;
+});
+
 const pushNotification = (title: string, content: string) => {
   const notificationId = `related-paper-${Date.now()}-${Math.random()}`;
   PLUIAPILocal.uiSlotService.updateSlot("overlayNotifications", {
@@ -293,7 +297,7 @@ watch(searchText, () => {
         </div>
 
         <div
-          v-else
+          v-else-if="hasSearchResultsMessage"
           class="px-3 py-2 text-[0.65rem] text-neutral-400 dark:text-neutral-500"
         >
           No matching papers found for “{{ lastSearchText }}”.
