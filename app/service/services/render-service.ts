@@ -16,13 +16,21 @@ const domPurifyInstance =
 
 type MuPDFModule = typeof import("mupdf");
 
+type MuPDFLoadError = Error & {
+  cause?: unknown;
+};
+
 let mupdfModulePromise: Promise<MuPDFModule | null> | null = null;
 
 async function loadMuPDF(): Promise<MuPDFModule | null> {
   if (!mupdfModulePromise) {
     mupdfModulePromise = import("mupdf")
       .then((module) => module as MuPDFModule)
-      .catch(() => null);
+      .catch((error) => {
+        const loadError = new Error("MuPDF is unavailable.") as MuPDFLoadError;
+        loadError.cause = error;
+        throw loadError;
+      });
   }
 
   return mupdfModulePromise;
