@@ -434,7 +434,7 @@ export class PaperService extends Eventable<IPaperServiceState> {
       realm.safeWrite(() => {
         const targetPaperIdSet = new Set(targetPaperIds);
         const allPaperEntities = Array.from(
-          this._paperEntityRepository.load(realm, "", "title", "desc")
+          this._paperEntityRepository.load(realm, "", "title", "desc") as Iterable<Entity>
         );
 
         for (const paperEntity of allPaperEntities) {

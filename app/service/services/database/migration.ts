@@ -3,6 +3,7 @@ import path from "path";
 import Realm from "realm";
 
 import { CategorizerType, PaperFolder, PaperTag } from "@/models/categorizer";
+import { normalizeFolderPath } from "@/base/folder";
 import { PaperEntity } from "@/models/paper-entity";
 import { PaperSmartFilter } from "@/models/smart-filter";
 
@@ -163,7 +164,7 @@ export function migrate(oldRealm: Realm, newRealm: Realm) {
 
         folder.children = [];
         folder.color = oldFolder.color || "blue";
-        folder.name = folder.name.replaceAll("/", "-");
+        folder.name = normalizeFolderPath(folder.name);
         folderRoot.children.push(folder);
         folder.count = folder.linkingObjects<PaperEntity>(
           PaperEntity.schema.name,
@@ -289,7 +290,7 @@ export function syncMigrate(
 
       folder.children = [];
       folder.color = folder.color || "blue";
-      folder.name = folder.name.replaceAll("/", "-");
+      folder.name = normalizeFolderPath(folder.name);
       folderRoot.children.push(folder);
       folder.count = folder.linkingObjects<PaperEntity>(
         PaperEntity.schema.name,

@@ -196,14 +196,15 @@ export class FileService extends Eventable<IFileServiceState> {
     );
   }
 
-  async deleteEmptyFolder(relativeFolderPath: string) {
+  async deleteEmptyFolder(relativeFolderPath: string, pruneParents = false) {
     const normalizedFolderPath = normalizeFolderPath(relativeFolderPath);
     if (!normalizedFolderPath) {
       return;
     }
 
+    const libraryFolder = await this.libraryFolder();
     const absoluteFolderPath = path.join(
-      await this.libraryFolder(),
+      libraryFolder,
       normalizedFolderPath
     );
     const children = await fsPromise.readdir(absoluteFolderPath);
@@ -212,6 +213,22 @@ export class FileService extends Eventable<IFileServiceState> {
     }
 
     await fsPromise.rmdir(absoluteFolderPath);
+
+    if (!pruneParents) {
+      return;
+    }
+
+    let parentFolderPath = getParentFolderPath(normalizedFolderPath);
+    while (parentFolderPath) {
+      const absoluteParentFolderPath = path.join(libraryFolder, parentFolderPath);
+      const parentChildren = await fsPromise.readdir(absoluteParentFolderPath);
+      if (parentChildren.length > 0) {
+        break;
+      }
+
+      await fsPromise.rmdir(absoluteParentFolderPath);
+      parentFolderPath = getParentFolderPath(parentFolderPath);
+    }
   }
 
   async listLibraryFolders() {

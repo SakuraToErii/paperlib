@@ -306,7 +306,7 @@ export class CategorizerService extends Eventable<ICategorizerServiceState> {
         if (targetFolder.name === "Folders") {
           continue;
         }
-        await this._fileService.deleteEmptyFolder(targetFolder.name);
+        await this._fileService.deleteEmptyFolder(targetFolder.name, true);
         await this._updateLinkedFolderPath(targetFolder.name, "");
       }
 
