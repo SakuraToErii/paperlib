@@ -601,25 +601,44 @@ export class PaperService extends Eventable<IPaperServiceState> {
     relatedIds: OID[],
     fromSync: boolean = false
   ) {
+    const normalizedPaperId = `${paperId}`;
+    if (!ObjectId.isValid(normalizedPaperId)) {
+      throw new Error(`Invalid paper id: ${paperId}`);
+    }
+
+    const requestedRelatedIds = Array.from(
+      new Set(
+        relatedIds
+          .map((id) => `${id}`)
+          .filter((id) => ObjectId.isValid(id) && id !== normalizedPaperId)
+      )
+    );
+
     if (!fromSync) {
       await PLAPILocal.syncService.addSyncLog("paper", "update", {
         relatedPaperUpdate: {
-          paperId,
-          relatedIds,
+          paperId: normalizedPaperId,
+          relatedIds: requestedRelatedIds,
         },
       });
     }
     const realm = await this._databaseCore.realm();
-    const normalizedPaperId = `${paperId}`;
-    const normalizedRelatedIds = Array.from(
-      new Set(relatedIds.map((id) => `${id}`).filter((id) => id !== normalizedPaperId))
-    );
 
     realm.safeWrite(() => {
-      const targetPaper = this._paperEntityRepository.loadByIds(realm, [paperId])[0] as Entity;
+      const targetPaper = this._paperEntityRepository.loadByIds(realm, [normalizedPaperId])[0] as Entity;
       if (!targetPaper) {
         throw new Error(`Paper not found: ${paperId}`);
       }
+
+      const existingRelatedPapers = Array.from(
+        this._paperEntityRepository.loadByIds(realm, requestedRelatedIds)
+      ) as Entity[];
+      const existingRelatedIds = new Set(
+        existingRelatedPapers.map((paper) => `${paper._id}`)
+      );
+      const normalizedRelatedIds = requestedRelatedIds.filter((id) =>
+        existingRelatedIds.has(id)
+      );
 
       const previouslyRelatedIds = new Set(
         (targetPaper.relatedPaperIds || []).map((id) => `${id}`)
@@ -628,16 +647,17 @@ export class PaperService extends Eventable<IPaperServiceState> {
         (id) => new ObjectId(id)
       ) as any;
 
-      for (const relatedId of normalizedRelatedIds) {
-        const relatedPaper = this._paperEntityRepository.loadByIds(realm, [relatedId])[0] as Entity;
-        if (!relatedPaper) {
+      for (const relatedPaper of existingRelatedPapers) {
+        const relatedPaperId = `${relatedPaper._id}`;
+        if (!existingRelatedIds.has(relatedPaperId)) {
           continue;
         }
         const nextIds = new Set((relatedPaper.relatedPaperIds || []).map((id) => `${id}`));
+        nextIds.delete(relatedPaperId);
         nextIds.add(normalizedPaperId);
-        relatedPaper.relatedPaperIds = Array.from(nextIds).map(
-          (id) => new ObjectId(id)
-        ) as any;
+        relatedPaper.relatedPaperIds = Array.from(nextIds)
+          .filter((id) => ObjectId.isValid(id) && id !== relatedPaperId)
+          .map((id) => new ObjectId(id)) as any;
       }
 
       for (const previouslyRelatedId of previouslyRelatedIds) {
@@ -650,7 +670,7 @@ export class PaperService extends Eventable<IPaperServiceState> {
           continue;
         }
         relatedPaper.relatedPaperIds = (relatedPaper.relatedPaperIds || [])
-          .filter((id) => `${id}` !== normalizedPaperId)
+          .filter((id) => `${id}` !== normalizedPaperId && `${id}` !== `${relatedPaper._id}`)
           .map((id) => new ObjectId(id)) as any;
       }
     });
