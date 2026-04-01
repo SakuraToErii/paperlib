@@ -6,6 +6,7 @@ import { ILogService, LogService } from "@/common/services/log-service";
 import { ProcessingKey, processing } from "@/common/utils/processing";
 import { HookService, IHookService } from "./hook-service";
 import { IEntityCollection, Entity } from "@/models/entity";
+import { PaperEntity } from "@/models/paper-entity";
 
 export const IScrapeService = createDecorator("scrapeService");
 
@@ -29,6 +30,21 @@ export const IScrapeService = createDecorator("scrapeService");
  * | ----------------
  */
 export class ScrapeService extends Eventable<{}> {
+  private _isPaperEntityPayload(payload: any): payload is {
+    type: "PaperEntity";
+    value: Entity | PaperEntity | Record<string, unknown>;
+  } {
+    return payload?.type === "PaperEntity" && payload?.value;
+  }
+
+  private _getPaperEntityDraftsFromPayloads(payloads: any[]): Entity[] | null {
+    if (payloads.length === 0 || !payloads.every((payload) => this._isPaperEntityPayload(payload))) {
+      return null;
+    }
+
+    return payloads.map((payload) => new Entity(payload.value as Partial<Entity>));
+  }
+
   constructor(
     @IHookService private readonly _hookService: HookService,
     @ILogService private readonly _logService: LogService
@@ -117,7 +133,9 @@ export class ScrapeService extends Eventable<{}> {
         let payloadChunk = payloads.slice(i, i + 10);
 
         // 1. Entry scraper transforms data source payloads into a PaperEntity list.
-        const paperEntityDrafts = await this.scrapeEntry(payloadChunk);
+        const paperEntityDrafts =
+          this._getPaperEntityDraftsFromPayloads(payloadChunk) ||
+          (await this.scrapeEntry(payloadChunk));
 
         if (paperEntityDrafts.length === 0) {
           this._logService.warn(
