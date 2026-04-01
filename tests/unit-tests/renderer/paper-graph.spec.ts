@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildPaperGraph,
+  getCanonicalFolderPath,
   getPaperGraphNeighborhood,
+  parsePalette,
   type PaperGraphData,
 } from "../../../app/renderer/utils/paper-graph";
 
@@ -102,5 +105,100 @@ describe("paper graph neighborhood helpers", () => {
     expect(noSelection.edges).not.toBe(graph.edges);
     expect(invalidSelection).toEqual(graph);
     expect(invalidSelection).not.toBe(graph);
+  });
+});
+
+describe("paper graph derivation semantics", () => {
+  const makeEntity = (overrides: Record<string, unknown> = {}) => ({
+    _id: overrides._id || "paper-1",
+    title: overrides.title || "Paper 1",
+    year: overrides.year || "2024",
+    month: overrides.month || "",
+    addTime: overrides.addTime || new Date("2024-01-01T00:00:00.000Z"),
+    relatedPaperIds: overrides.relatedPaperIds || [],
+    folders: overrides.folders || [],
+  });
+
+  it("prefers the deepest normalized folder path as the canonical graph folder", () => {
+    const canonicalFolderPath = getCanonicalFolderPath(
+      makeEntity({
+        folders: [
+          { name: " Research \\ ML " },
+          { name: "Research/ML/Agents" },
+          { name: "Research" },
+        ],
+      }) as any
+    );
+
+    expect(canonicalFolderPath).toBe("Research/ML/Agents");
+  });
+
+  it("builds one undirected edge per valid relation and ignores self or missing targets", () => {
+    const paperA = makeEntity({
+      _id: "paper-a",
+      year: "2022",
+      relatedPaperIds: ["paper-b", "paper-b", "paper-a", "missing-paper"],
+      folders: [{ name: "Research/ML" }],
+    });
+    const paperB = makeEntity({
+      _id: "paper-b",
+      year: "2024",
+      relatedPaperIds: ["paper-a"],
+      folders: [{ name: "Research/ML/Agents" }],
+    });
+    const paperC = makeEntity({
+      _id: "paper-c",
+      year: "2023",
+      relatedPaperIds: [],
+      folders: [{ name: " Archive " }],
+    });
+
+    const graph = buildPaperGraph([paperA, paperB, paperC] as any);
+
+    expect(graph.edges).toEqual([
+      { id: "paper-a::paper-b", source: "paper-a", target: "paper-b" },
+    ]);
+    expect(graph.nodes.map((node) => ({
+      id: node.id,
+      relationCount: node.relationCount,
+      folderPath: node.folderPath,
+      rootFolder: node.rootFolder,
+    }))).toEqual([
+      {
+        id: "paper-a",
+        relationCount: 1,
+        folderPath: "Research/ML",
+        rootFolder: "Research",
+      },
+      {
+        id: "paper-b",
+        relationCount: 1,
+        folderPath: "Research/ML/Agents",
+        rootFolder: "Research",
+      },
+      {
+        id: "paper-c",
+        relationCount: 0,
+        folderPath: "Archive",
+        rootFolder: "Archive",
+      },
+    ]);
+  });
+
+  it("normalizes palette inputs and falls back when none are valid", () => {
+    expect(parsePalette("10b981, #3b82f6, invalid, #abc")).toEqual([
+      "#10b981",
+      "#3b82f6",
+    ]);
+    expect(parsePalette("invalid,#12")).toEqual([
+      "#10b981",
+      "#3b82f6",
+      "#f59e0b",
+      "#8b5cf6",
+      "#ef4444",
+      "#06b6d4",
+      "#ec4899",
+      "#84cc16",
+    ]);
   });
 });
