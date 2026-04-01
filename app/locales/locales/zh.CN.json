@@ -67,9 +67,15 @@
     "graphNeighborhoodSelectDescription": "邻域模式会将图谱聚焦到当前选中的论文，并只显示直接关联的论文。",
     "graphNeighborhoodUnavailableTitle": "当前图谱中无法显示所选论文。",
     "graphNeighborhoodUnavailableDescription": "请选择当前图谱中可见的论文，或切换回完整图谱视图。",
+    "graphReturnToWholeGraph": "返回完整图谱",
     "graphEmptyDescription": "添加关联论文，或选择更大的文件夹范围，即可在此查看连接关系。",
     "graphLegendDescription": "悬停或聚焦某个节点，以高亮它的直接邻域。",
-    "graphInteractionHint": "拖动画布空白处可平移。滚动可缩放。聚焦此视图时可按 +、-、0 或 Esc。"
+    "graphInteractionHint": "拖动画布空白处可平移。滚动可缩放。聚焦此视图时可按 +、-、0 或 Esc。",
+    "graphFocusSelected": "聚焦所选论文",
+    "graphBackToView": "返回{view}",
+    "list": "列表视图",
+    "table": "表格视图",
+    "tableandpreview": "表格 + 预览"
   },
   "smartfilter": {
     "startops": "起始运算符",

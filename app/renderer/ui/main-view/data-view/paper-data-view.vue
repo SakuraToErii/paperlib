@@ -197,6 +197,10 @@ const onItemClicked = async (selectedIndex: number[]) => {
   uiState.selectedIndex = selectedIndex;
 };
 
+const onGraphMainViewTypeChanged = (viewType: string) => {
+  PLMainAPI.preferenceService.set({ mainviewType: viewType });
+};
+
 disposable(
   PLUIAPILocal.uiStateService.onChanged(
     "selectedIndex",
@@ -445,6 +449,7 @@ onMounted(() => {
       :graph-palette="prefState.graphColorPalette"
       @event:click="onItemClicked"
       @event:dblclick="onItemDoubleClicked"
+      @event:change-mainview-type="onGraphMainViewTypeChanged"
     />
     <TableView
       id="table-data-view"

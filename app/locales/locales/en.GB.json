@@ -67,9 +67,15 @@
     "graphNeighborhoodSelectDescription": "Neighborhood mode centers the graph on the current selection and shows only directly related papers.",
     "graphNeighborhoodUnavailableTitle": "Selected paper is not available in this graph.",
     "graphNeighborhoodUnavailableDescription": "Choose a paper that is visible in the current graph, or switch back to the whole graph view.",
+    "graphReturnToWholeGraph": "Back to whole graph",
     "graphEmptyDescription": "Add related papers or select a broader folder to see connections here.",
     "graphLegendDescription": "Hover or focus a node to highlight its immediate neighborhood.",
-    "graphInteractionHint": "Drag empty space to pan. Scroll to zoom. Press +, -, 0, or Esc while this view is focused."
+    "graphInteractionHint": "Drag empty space to pan. Scroll to zoom. Press +, -, 0, or Esc while this view is focused.",
+    "graphFocusSelected": "Focus selected paper",
+    "graphBackToView": "Back to {view}",
+    "list": "list",
+    "table": "table",
+    "tableandpreview": "table + preview"
   },
   "smartfilter": {
     "startops": "Start Ops",

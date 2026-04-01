@@ -62,9 +62,15 @@
     "graphNeighborhoodSelectDescription": "يركّز وضع الجوار الرسم البياني على التحديد الحالي ويعرض فقط الأوراق المرتبطة مباشرةً.",
     "graphNeighborhoodUnavailableTitle": "الورقة المحددة غير متاحة في هذا الرسم البياني.",
     "graphNeighborhoodUnavailableDescription": "اختر ورقة ظاهرة في الرسم البياني الحالي، أو ارجع إلى عرض الرسم البياني الكامل.",
+    "graphReturnToWholeGraph": "العودة إلى الرسم البياني الكامل",
     "graphEmptyDescription": "أضف أوراقًا مرتبطة أو اختر مجلدًا أوسع لرؤية العلاقات هنا.",
     "graphLegendDescription": "مرّر فوق عقدة أو ركّز عليها لإبراز جوارها المباشر.",
-    "graphInteractionHint": "اسحب المساحة الفارغة للتحريك. مرّر للتكبير أو التصغير. اضغط + أو - أو 0 أو Esc أثناء تركيز هذا العرض."
+    "graphInteractionHint": "اسحب المساحة الفارغة للتحريك. مرّر للتكبير أو التصغير. اضغط + أو - أو 0 أو Esc أثناء تركيز هذا العرض.",
+    "graphFocusSelected": "ركّز الورقة المحددة",
+    "graphBackToView": "العودة إلى {view}",
+    "list": "القائمة",
+    "table": "الجدول",
+    "tableandpreview": "الجدول + المعاينة"
   },
   "smartfilter": {
     "startops": "إبدأ العمليات",

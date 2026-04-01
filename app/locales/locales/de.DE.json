@@ -63,9 +63,15 @@
     "graphNeighborhoodSelectDescription": "Der Nachbarschaftsmodus zentriert den Graphen auf die aktuelle Auswahl und zeigt nur direkt verbundene Arbeiten an.",
     "graphNeighborhoodUnavailableTitle": "Die ausgewählte Arbeit ist in diesem Graphen nicht verfügbar.",
     "graphNeighborhoodUnavailableDescription": "Wähle eine Arbeit, die im aktuellen Graphen sichtbar ist, oder wechsle zurück zur Ansicht des gesamten Graphen.",
+    "graphReturnToWholeGraph": "Zurück zum gesamten Graphen",
     "graphEmptyDescription": "Füge verknüpfte Arbeiten hinzu oder wähle einen umfassenderen Ordner, um hier Verbindungen zu sehen.",
     "graphLegendDescription": "Bewege den Mauszeiger über einen Knoten oder fokussiere ihn, um seine direkte Nachbarschaft hervorzuheben.",
-    "graphInteractionHint": "Ziehe den leeren Bereich zum Verschieben. Scrolle zum Zoomen. Drücke +, -, 0 oder Esc, wenn diese Ansicht fokussiert ist."
+    "graphInteractionHint": "Ziehe den leeren Bereich zum Verschieben. Scrolle zum Zoomen. Drücke +, -, 0 oder Esc, wenn diese Ansicht fokussiert ist.",
+    "graphFocusSelected": "Ausgewählte Arbeit fokussieren",
+    "graphBackToView": "Zurück zu {view}",
+    "list": "Liste",
+    "table": "Tabelle",
+    "tableandpreview": "Tabelle + Vorschau"
   },
   "smartfilter": {
     "startops": "Start Ops",

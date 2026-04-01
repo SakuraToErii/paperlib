@@ -30,7 +30,11 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["event:click", "event:dblclick"]);
+const emits = defineEmits([
+  "event:click",
+  "event:dblclick",
+  "event:change-mainview-type",
+]);
 const i18n = useI18n();
 
 const container = ref<HTMLElement | null>(null);
@@ -44,6 +48,9 @@ const focusedNodeId = ref("");
 const isPanning = ref(false);
 const graphDisplayMode = ref<GraphDisplayMode>("all");
 const panStart = ref({ x: 0, y: 0, panX: 0, panY: 0 });
+
+const viewModeOrder = ["list", "table", "tableandpreview", "graph"] as const;
+type MainViewMode = (typeof viewModeOrder)[number];
 
 const updateViewport = () => {
   if (!container.value) {
@@ -283,6 +290,18 @@ const activeNodeMetaText = computed(() => {
   });
 });
 
+const previousViewMode = computed<MainViewMode>(() => {
+  return viewModeOrder[viewModeOrder.length - 2];
+});
+
+const canFocusSelectedPaper = computed(() => {
+  return hasSelectedNodeInGraph.value && graphDisplayMode.value !== "neighborhood";
+});
+
+const showSelectionActions = computed(() => {
+  return graph.value.nodes.length > 0 && hasSelectedNodeInGraph.value;
+});
+
 const fitGraph = () => {
   zoom.value = 1;
   panX.value = 0;
@@ -295,6 +314,19 @@ const zoomBy = (factor: number) => {
 
 const setGraphDisplayMode = (mode: GraphDisplayMode) => {
   graphDisplayMode.value = mode;
+};
+
+const focusSelectedPaper = () => {
+  if (!canFocusSelectedPaper.value || !selectedNodeId.value) {
+    return;
+  }
+
+  focusedNodeId.value = selectedNodeId.value;
+  graphDisplayMode.value = "neighborhood";
+};
+
+const returnToPreviousView = () => {
+  emits("event:change-mainview-type", previousViewMode.value);
 };
 
 const onWheel = (event: WheelEvent) => {
@@ -538,6 +570,24 @@ const graphTransform = computed(() => {
         </div>
       </div>
       <div
+        v-if="showSelectionActions"
+        class="pointer-events-auto flex flex-wrap gap-1 rounded-lg border border-neutral-200 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-neutral-700 dark:bg-neutral-800/90"
+      >
+        <button
+          class="h-8 rounded-md px-3 text-xxs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          :disabled="!canFocusSelectedPaper"
+          @click="focusSelectedPaper"
+        >
+          {{ $t("mainview.graphFocusSelected") }}
+        </button>
+        <button
+          class="h-8 rounded-md px-3 text-xxs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          @click="returnToPreviousView"
+        >
+          {{ $t("mainview.graphBackToView", { view: $t(`mainview.${previousViewMode}`) }) }}
+        </button>
+      </div>
+      <div
         v-if="activeNode"
         class="max-w-[18rem] rounded-md border border-blue-200 bg-blue-50/95 px-3 py-2 text-xxs text-blue-900 shadow-sm backdrop-blur dark:border-blue-900/80 dark:bg-blue-950/70 dark:text-blue-100"
       >
@@ -590,6 +640,12 @@ const graphTransform = computed(() => {
             ? $t("mainview.graphNeighborhoodUnavailableDescription")
             : $t("mainview.graphNeighborhoodSelectDescription") }}
         </div>
+        <button
+          class="mt-4 h-8 rounded-md bg-blue-600 px-3 text-xs font-medium text-white transition-colors hover:bg-blue-500 focus-visible:ring-2 focus-visible:ring-blue-400"
+          @click="setGraphDisplayMode('all')"
+        >
+          {{ $t("mainview.graphReturnToWholeGraph") }}
+        </button>
       </div>
     </div>
 
@@ -604,6 +660,12 @@ const graphTransform = computed(() => {
         <div class="mt-2 text-xs leading-5 text-neutral-500 dark:text-neutral-400">
           {{ $t("mainview.graphEmptyDescription") }}
         </div>
+        <button
+          class="mt-4 h-8 rounded-md border border-neutral-200 bg-white px-3 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          @click="returnToPreviousView"
+        >
+          {{ $t("mainview.graphBackToView", { view: $t(`mainview.${previousViewMode}`) }) }}
+        </button>
       </div>
     </div>
 

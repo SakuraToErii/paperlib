@@ -63,9 +63,15 @@
     "graphNeighborhoodSelectDescription": "鄰域模式會將圖譜聚焦於目前選取的論文，並只顯示直接相關的論文。",
     "graphNeighborhoodUnavailableTitle": "目前圖譜中無法顯示所選論文。",
     "graphNeighborhoodUnavailableDescription": "請選擇目前圖譜中可見的論文，或切換回完整圖譜視圖。",
+    "graphReturnToWholeGraph": "返回完整圖譜",
     "graphEmptyDescription": "新增關聯論文，或選擇更大的資料夾範圍，即可在此查看連線關係。",
     "graphLegendDescription": "懸停或聚焦某個節點，以醒目顯示它的直接鄰域。",
-    "graphInteractionHint": "拖曳畫布空白處可平移。滾動可縮放。聚焦此視圖時可按 +、-、0 或 Esc。"
+    "graphInteractionHint": "拖曳畫布空白處可平移。滾動可縮放。聚焦此視圖時可按 +、-、0 或 Esc。",
+    "graphFocusSelected": "聚焦所選論文",
+    "graphBackToView": "返回{view}",
+    "list": "清單檢視",
+    "table": "表格檢視",
+    "tableandpreview": "表格 + 預覽"
   },
   "smartfilter": {
     "startops": "起始運算子",
