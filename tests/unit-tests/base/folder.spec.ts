@@ -6,6 +6,7 @@ import {
   getFolderPrefixQuery,
   isFolderPathInside,
   isInternalLibraryPath,
+  joinFolderPath,
   normalizeFolderPath,
 } from "../../../app/base/folder";
 import { QuerySentenceService } from "../../../app/renderer/services/querysentence-service";
@@ -38,6 +39,16 @@ describe("folder compatibility helpers", () => {
   it("keeps empty parent filters compatible with legacy default behavior", () => {
     expect(isFolderPathInside("Research/ML", "")).toBe(true);
     expect(isFolderPathInside("Research/ML", "   ")).toBe(true);
+  });
+
+  it("keeps nested rename targets under the selected parent path", () => {
+    expect(joinFolderPath("Research", "Research/ML-Renamed")).toBe(
+      "Research/Research/ML-Renamed"
+    );
+    expect(joinFolderPath("Research", "ML-Renamed")).toBe("Research/ML-Renamed");
+    expect(normalizeFolderPath("Research/ML-Renamed").split("/").pop()).toBe(
+      "ML-Renamed"
+    );
   });
 
   it("treats only exact parents and descendants as inside", () => {

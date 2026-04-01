@@ -437,9 +437,14 @@ export class CategorizerService extends Eventable<ICategorizerServiceState> {
       const parentFolderPath = parentCategorizer && parentCategorizer.name !== "Folders"
         ? normalizeFolderPath(parentCategorizer.name)
         : "";
-      const targetFolderPath = joinFolderPath(parentFolderPath, categorizer.name);
+      const targetFolderName = normalizeFolderPath(categorizer.name).split("/").pop() || "";
+      const targetFolderPath = joinFolderPath(parentFolderPath, targetFolderName);
 
-      if (currentFolderPath && isFolderPathInside(parentFolderPath, currentFolderPath)) {
+      if (
+        currentFolderPath &&
+        parentFolderPath &&
+        isFolderPathInside(parentFolderPath, currentFolderPath)
+      ) {
         throw new Error("Circular folder move is not allowed.");
       }
 
