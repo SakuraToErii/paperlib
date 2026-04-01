@@ -468,6 +468,26 @@ export class SyncService extends Eventable<ISyncServiceState> {
                 );
                 break;
               }
+              if (logValue.relatedPaperBatchUpdate) {
+                const { paperIds, action } = logValue.relatedPaperBatchUpdate;
+                if (action === "relate") {
+                  await PLAPILocal.paperService.relateSelectedPapers(
+                    paperIds,
+                    true
+                  );
+                  break;
+                }
+                if (action === "unrelate") {
+                  await PLAPILocal.paperService.unrelateSelectedPapers(
+                    paperIds,
+                    true
+                  );
+                  break;
+                }
+                throw new Error(
+                  "Unsupported related paper batch action: " + action
+                );
+              }
               await PLAPILocal.paperService.update(
                 logValue.paperEntityDrafts,
                 logValue.updateCache,

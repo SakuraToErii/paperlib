@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const addSyncLog = vi.fn(async () => undefined);
+
 vi.mock("../../../app/models/entity", async () => {
   const { ObjectId } = await import("bson");
 
@@ -122,9 +124,10 @@ function relatedIdsOf(papers: Map<string, InMemoryPaper>, id: string) {
 
 describe("PaperService relations", () => {
   beforeEach(() => {
+    addSyncLog.mockClear();
     globalThis.PLAPILocal = {
       syncService: {
-        addSyncLog: vi.fn(async () => undefined),
+        addSyncLog,
       },
     };
   });
@@ -233,7 +236,7 @@ describe("PaperService relations", () => {
       createPaper(paperD, [paperA, paperB]),
     ]);
 
-    await service.setBatchRelatedPaperIds([
+    await service.relateSelectedPapers([
       paperA,
       paperB,
       paperC,
@@ -242,10 +245,32 @@ describe("PaperService relations", () => {
       "507f1f77bcf86cd7994390ff",
     ] as any);
 
+    expect(addSyncLog).toHaveBeenCalledWith("paper", "update", {
+      relatedPaperBatchUpdate: {
+        paperIds: [paperA, paperB, paperC, "507f1f77bcf86cd7994390ff"],
+        action: "relate",
+      },
+    });
     expect(relatedIdsOf(papers, paperA)).toEqual([paperD, paperB, paperC]);
     expect(relatedIdsOf(papers, paperB)).toEqual([paperD, paperA, paperC]);
     expect(relatedIdsOf(papers, paperC)).toEqual([paperA, paperB]);
     expect(relatedIdsOf(papers, paperD)).toEqual([paperA, paperB]);
+  });
+
+  it("batch relate skips logging when replayed from sync", async () => {
+    const paperA = "507f1f77bcf86cd799439081";
+    const paperB = "507f1f77bcf86cd799439082";
+
+    const { service, papers } = createHarness([
+      createPaper(paperA),
+      createPaper(paperB),
+    ]);
+
+    await service.relateSelectedPapers([paperA, paperB] as any, true);
+
+    expect(addSyncLog).not.toHaveBeenCalled();
+    expect(relatedIdsOf(papers, paperA)).toEqual([paperB]);
+    expect(relatedIdsOf(papers, paperB)).toEqual([paperA]);
   });
 
   it("batch unrelate removes only intra-selection edges and preserves outside links", async () => {
@@ -261,7 +286,7 @@ describe("PaperService relations", () => {
       createPaper(paperD, [paperA, paperB]),
     ]);
 
-    await service.removeBatchRelatedPaperIds([
+    await service.unrelateSelectedPapers([
       paperA,
       paperB,
       paperC,
@@ -270,9 +295,34 @@ describe("PaperService relations", () => {
       "507f1f77bcf86cd7994390ff",
     ] as any);
 
+    expect(addSyncLog).toHaveBeenCalledWith("paper", "update", {
+      relatedPaperBatchUpdate: {
+        paperIds: [paperA, paperB, paperC, "507f1f77bcf86cd7994390ff"],
+        action: "unrelate",
+      },
+    });
     expect(relatedIdsOf(papers, paperA)).toEqual([paperD]);
     expect(relatedIdsOf(papers, paperB)).toEqual([paperD]);
     expect(relatedIdsOf(papers, paperC)).toEqual([]);
     expect(relatedIdsOf(papers, paperD)).toEqual([paperA, paperB]);
+  });
+
+  it("batch unrelate skips logging when replayed from sync", async () => {
+    const paperA = "507f1f77bcf86cd799439091";
+    const paperB = "507f1f77bcf86cd799439092";
+    const paperC = "507f1f77bcf86cd799439093";
+
+    const { service, papers } = createHarness([
+      createPaper(paperA, [paperB, paperC]),
+      createPaper(paperB, [paperA]),
+      createPaper(paperC, [paperA]),
+    ]);
+
+    await service.unrelateSelectedPapers([paperA, paperB] as any, true);
+
+    expect(addSyncLog).not.toHaveBeenCalled();
+    expect(relatedIdsOf(papers, paperA)).toEqual([paperC]);
+    expect(relatedIdsOf(papers, paperB)).toEqual([]);
+    expect(relatedIdsOf(papers, paperC)).toEqual([paperA]);
   });
 });
