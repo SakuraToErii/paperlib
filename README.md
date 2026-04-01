@@ -111,7 +111,44 @@ pnpm install
 
 Requirements:
 - Node.js 20.14+
-- pnpm
+- pnpm (v9 recommended; pnpm v10 requires approving install/build scripts for native/Electron deps)
+
+Install dependencies:
+
+```bash
+pnpm install
+```
+
+If you use pnpm v10+, approve the build/install scripts that Paperlib depends on before starting the app:
+
+```bash
+pnpm approve-builds electron esbuild keytar realm vue-demi
+pnpm install
+```
+
+Without that approval, pnpm skips Electron's install script, `node_modules/electron/dist` is never downloaded, and `pnpm run dev` fails with `Error: Electron uninstall`.
+
+Fresh-machine note:
+- `pnpm install` can succeed while still skipping Electron's postinstall download if your pnpm config requires explicit approval for build scripts.
+- If `pnpm run dev` fails with `Error: Electron uninstall` or `Electron failed to install correctly`, approve the blocked build scripts and reinstall/rebuild Electron.
+
+Recommended recovery steps:
+
+```bash
+pnpm approve-builds
+pnpm install
+pnpm exec electron --version
+```
+
+If Electron is still missing, use the package's own fallback reinstall path:
+
+```bash
+rm -rf node_modules/electron
+pnpm add -D electron@31.1.0
+pnpm exec electron --version
+```
+
+You should only continue once `pnpm exec electron --version` prints the installed Electron version successfully.
 
 ### 2. Start the app in development mode
 
