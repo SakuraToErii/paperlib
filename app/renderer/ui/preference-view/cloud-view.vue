@@ -37,8 +37,12 @@ const onOfficialLogouClicked = async () => {
 // =============================================================================
 // Legacy Realm Sync
 const onRealmLoginClicked = async () => {
-  await PLMainAPI.preferenceService.set({ syncAPPID: deprecatedSyncAPPID.value });
-  await PLMainAPI.preferenceService.set({ syncEmail: deprecatedSyncEmail.value });
+  await PLMainAPI.preferenceService.set({
+    syncAPPID: deprecatedSyncAPPID.value,
+  });
+  await PLMainAPI.preferenceService.set({
+    syncEmail: deprecatedSyncEmail.value,
+  });
   await PLMainAPI.preferenceService.setPassword(
     "realmSync",
     deprecatedSyncPassword.value
@@ -132,7 +136,8 @@ onMounted(() => {
           <span class="m-auto">{{ $t("preference.logout") }}</span>
         </button>
         <p class="my-auto px-2">
-          You are now logged in as <span class="font-semibold">{{ syncUserInfo }}</span>
+          You are now logged in as
+          <span class="font-semibold">{{ syncUserInfo }}</span>
         </p>
       </div>
     </div>
@@ -163,21 +168,21 @@ onMounted(() => {
         type="text"
         placeholder="Username"
         v-model="deprecatedSyncEmail"
-        :disabled="prefState.useSync!='realm'"
-        :class="prefState.useSync=='realm' ? 'text-neutral-400' : ''"
+        :disabled="prefState.useSync != 'realm'"
+        :class="prefState.useSync == 'realm' ? 'text-neutral-400' : ''"
       />
       <input
         class="p-2 rounded-md text-xs bg-neutral-200 dark:bg-neutral-700 focus:outline-none grow"
         type="password"
         placeholder="Password"
         v-model="deprecatedSyncPassword"
-        :disabled="prefState.useSync!='realm'"
-        :class="prefState.useSync=='realm' ? 'text-neutral-400' : ''"
+        :disabled="prefState.useSync != 'realm'"
+        :class="prefState.useSync == 'realm' ? 'text-neutral-400' : ''"
       />
       <div class="flex justify-between text-xs flex-none">
         <button
           class="flex h-full w-[5.5rem] my-auto text-center rounded-md bg-neutral-200 dark:bg-neutral-600"
-          v-if="prefState.useSync!='realm'"
+          v-if="prefState.useSync != 'realm'"
           @click="onRealmLoginClicked"
           :disabled="
             deprecatedSyncAPPID.length === 0 &&
@@ -185,8 +190,8 @@ onMounted(() => {
             deprecatedSyncPassword.length === 0
           "
           :class="
-          deprecatedSyncAPPID.length !== 0 &&
-          deprecatedSyncEmail.length !== 0 &&
+            deprecatedSyncAPPID.length !== 0 &&
+            deprecatedSyncEmail.length !== 0 &&
             deprecatedSyncPassword.length !== 0
               ? 'hover:bg-neutral-300 hover:dark:bg-neutral-500'
               : 'text-neutral-400 '
@@ -196,7 +201,7 @@ onMounted(() => {
         </button>
         <button
           class="flex h-full w-[5.5rem] my-auto text-center rounded-md bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-600 hover:dark:bg-neutral-500"
-          v-if="prefState.useSync=='realm'"
+          v-if="prefState.useSync == 'realm'"
           @click="onRealmLogouClicked"
         >
           <span class="m-auto">{{ $t("preference.logout") }}</span>
@@ -208,7 +213,7 @@ onMounted(() => {
       class="mb-5"
       :title="$t('preference.flexibleSyncTitle')"
       :info="$t('preference.flexibleSyncIntro')"
-      :enable="prefState.useSync=='realm'&&prefState.isFlexibleSync"
+      :enable="prefState.useSync == 'realm' && prefState.isFlexibleSync"
       @event:change="
         (value) => {
           onUpdate('isFlexibleSync', value);
@@ -234,7 +239,7 @@ onMounted(() => {
     </div>
 
     <hr class="mb-5 dark:border-neutral-600" />
-<!--File Storage-->
+    <!--File Storage-->
     <div class="text-base font-semibold mb-4">
       {{ $t("preference.filestorage") }}
     </div>
