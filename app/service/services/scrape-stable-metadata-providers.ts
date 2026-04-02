@@ -2,7 +2,10 @@ import { XMLParser } from "fast-xml-parser";
 
 import { Entity } from "@/models/entity";
 
-import { ScrapeProviderDescriptor, ScrapeProviderResult } from "./scrape-contract";
+import {
+  ScrapeProviderDescriptor,
+  ScrapeProviderResult,
+} from "./scrape-contract";
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -112,7 +115,10 @@ function formatDateFromParts(parts?: Array<string | number>): string {
     .join("-");
 }
 
-function cloneEntityWithMetadata(entity: Entity, metadata: Partial<Entity>): Entity {
+function cloneEntityWithMetadata(
+  entity: Entity,
+  metadata: Partial<Entity>
+): Entity {
   const draft = new Entity(entity);
 
   for (const [key, value] of Object.entries(metadata)) {
@@ -156,7 +162,9 @@ abstract class BaseStableMetadataProvider implements StableMetadataProvider {
     this._fetch = options.fetch || fetch;
   }
 
-  async scrape(paperEntityDrafts: Entity[]): Promise<ScrapeProviderResult<Entity[]>> {
+  async scrape(
+    paperEntityDrafts: Entity[]
+  ): Promise<ScrapeProviderResult<Entity[]>> {
     const warnings: string[] = [];
     let matchedCount = 0;
     let requestedCount = 0;
@@ -179,20 +187,30 @@ abstract class BaseStableMetadataProvider implements StableMetadataProvider {
           return cloneEntityWithMetadata(paperEntityDraft, metadata);
         } catch (error) {
           warnings.push(
-            `${this.descriptor.id}: ${(error as Error).message || "unknown error"}`
+            `${this.descriptor.id}: ${
+              (error as Error).message || "unknown error"
+            }`
           );
           return new Entity(paperEntityDraft);
         }
       })
     );
 
-    const status = matchedCount > 0 ? "matched" : warnings.length > 0 ? "error" : "no-match";
+    const status =
+      matchedCount > 0 ? "matched" : warnings.length > 0 ? "error" : "no-match";
 
-    return createResult(this.descriptor, status, this._basis(), data, warnings, {
-      requestedCount,
-      matchedCount,
-      totalCount: paperEntityDrafts.length,
-    });
+    return createResult(
+      this.descriptor,
+      status,
+      this._basis(),
+      data,
+      warnings,
+      {
+        requestedCount,
+        matchedCount,
+        totalCount: paperEntityDrafts.length,
+      }
+    );
   }
 
   protected abstract _basis(): ScrapeProviderResult<Entity[]>["basis"];
@@ -238,7 +256,9 @@ export class DOIMetadataProvider extends BaseStableMetadataProvider {
       throw new Error(`Crossref request failed with ${response.status}`);
     }
 
-    const payload = (await response.json()) as { message?: CrossrefWorkMessage };
+    const payload = (await response.json()) as {
+      message?: CrossrefWorkMessage;
+    };
     const message = payload.message;
     if (!message) {
       return null;
@@ -256,8 +276,12 @@ export class DOIMetadataProvider extends BaseStableMetadataProvider {
       authors: joinAuthors(message.author || []),
       abstract: compactWhitespace(message.abstract),
       publication,
-      journal: publicationType.includes("proceedings") ? undefined : publication,
-      booktitle: publicationType.includes("proceedings") ? publication : undefined,
+      journal: publicationType.includes("proceedings")
+        ? undefined
+        : publication,
+      booktitle: publicationType.includes("proceedings")
+        ? publication
+        : undefined,
       pubTime,
       year,
       volume: compactWhitespace(message.volume),
@@ -298,7 +322,9 @@ export class ArxivMetadataProvider extends BaseStableMetadataProvider {
     }
 
     const response = await this._fetch(
-      `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(arxivId)}`
+      `https://export.arxiv.org/api/query?id_list=${encodeURIComponent(
+        arxivId
+      )}`
     );
     if (!response.ok) {
       throw new Error(`arXiv request failed with ${response.status}`);

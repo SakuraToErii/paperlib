@@ -9,7 +9,10 @@ import {
   normalizeDOI,
 } from "../../../app/service/services/scrape-stable-metadata-providers";
 
-function createResponse(body: unknown, init: { ok?: boolean; status?: number } = {}) {
+function createResponse(
+  body: unknown,
+  init: { ok?: boolean; status?: number } = {}
+) {
   const { ok = true, status = 200 } = init;
 
   return {
@@ -26,9 +29,13 @@ function createResponse(body: unknown, init: { ok?: boolean; status?: number } =
 
 describe("scrape stable metadata providers", () => {
   it("normalizes DOI and arXiv identifiers for builtin provider requests", () => {
-    expect(normalizeDOI("https://doi.org/10.1000/xyz-123")).toBe("10.1000/xyz-123");
+    expect(normalizeDOI("https://doi.org/10.1000/xyz-123")).toBe(
+      "10.1000/xyz-123"
+    );
     expect(normalizeDOI("doi: 10.1000/xyz-123 ")).toBe("10.1000/xyz-123");
-    expect(normalizeArxivId("https://arxiv.org/abs/2404.01234v2")).toBe("2404.01234v2");
+    expect(normalizeArxivId("https://arxiv.org/abs/2404.01234v2")).toBe(
+      "2404.01234v2"
+    );
     expect(normalizeArxivId("arXiv: 2404.01234v2 ")).toBe("2404.01234v2");
   });
 
@@ -55,7 +62,9 @@ describe("scrape stable metadata providers", () => {
         },
       })
     );
-    const provider = new DOIMetadataProvider({ fetch: fetchMock as typeof fetch });
+    const provider = new DOIMetadataProvider({
+      fetch: fetchMock as typeof fetch,
+    });
     const seed = new Entity({
       _id: "507f1f77bcf86cd799439011",
       title: "Seed Title",
@@ -69,7 +78,9 @@ describe("scrape stable metadata providers", () => {
 
     const result = await provider.scrape([seed]);
 
-    expect(fetchMock).toHaveBeenCalledWith("https://api.crossref.org/works/10.1000%2Ftest-doi");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.crossref.org/works/10.1000%2Ftest-doi"
+    );
     expect(result.status).toBe("matched");
     expect(result.basis).toBe("doi");
     expect(result.warnings).toEqual([]);
@@ -108,7 +119,9 @@ describe("scrape stable metadata providers", () => {
   </entry>
 </feed>`)
     );
-    const provider = new ArxivMetadataProvider({ fetch: fetchMock as typeof fetch });
+    const provider = new ArxivMetadataProvider({
+      fetch: fetchMock as typeof fetch,
+    });
     const seed = new Entity({
       _id: "507f1f77bcf86cd799439022",
       title: "Seed arXiv Title",
@@ -139,7 +152,9 @@ describe("scrape stable metadata providers", () => {
 
   it("preserves unmatched drafts and reports no-match when stable identifiers are absent", async () => {
     const fetchMock = vi.fn();
-    const providers = createStableMetadataProviders({ fetch: fetchMock as typeof fetch });
+    const providers = createStableMetadataProviders({
+      fetch: fetchMock as typeof fetch,
+    });
     const seed = new Entity({
       _id: "507f1f77bcf86cd799439033",
       title: "No identifier",
