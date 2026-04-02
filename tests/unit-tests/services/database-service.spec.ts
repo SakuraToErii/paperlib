@@ -113,12 +113,10 @@ describe("DatabaseService.initialize bootstrap support", () => {
     ]);
 
     let releaseInitRealm = () => {};
-    const initRealm = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          releaseInitRealm = resolve;
-        })
-    );
+    const initRealmReady = new Promise<void>((resolve) => {
+      releaseInitRealm = resolve;
+    });
+    const initRealm = vi.fn(() => initRealmReady);
     const service = new DatabaseService({
       initRealm,
       on: vi.fn(),
@@ -126,6 +124,8 @@ describe("DatabaseService.initialize bootstrap support", () => {
 
     const firstInitialize = service.initialize();
     const secondInitialize = service.initialize();
+
+    await Promise.resolve();
 
     expect(initRealm).toHaveBeenCalledTimes(2);
     expect(PLAPILocal.paperService.create).not.toHaveBeenCalled();

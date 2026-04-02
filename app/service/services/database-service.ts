@@ -53,7 +53,9 @@ export class DatabaseService extends Eventable<IDatabaseServiceState> {
       return [];
     }
 
-    return listAllFiles(appLibFolder).filter((filePath) => /\.pdf$/i.test(filePath));
+    return listAllFiles(appLibFolder).filter((filePath) =>
+      /\.pdf$/i.test(filePath)
+    );
   }
 
   private async _reserveLocalLibraryBootstrap() {
@@ -89,7 +91,7 @@ export class DatabaseService extends Eventable<IDatabaseServiceState> {
   @processing(ProcessingKey.General)
   @errorcatching("Failed to initialize the database.", true, "DatabaseService")
   async initialize(reinit: boolean = true) {
-    const localLibraryBootstrapPromise = await this._reserveLocalLibraryBootstrap();
+    const localLibraryBootstrapPromise = this._reserveLocalLibraryBootstrap();
     await this._databaseCore.initRealm(reinit);
     this._releaseLocalLibraryBootstrap?.();
     await localLibraryBootstrapPromise;
