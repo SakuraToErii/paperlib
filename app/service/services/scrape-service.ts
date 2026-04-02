@@ -308,6 +308,11 @@ export class ScrapeService extends Eventable<{}> {
     let paperEntityDrafts: Entity[] = [];
 
     if (this._hookService.hasHook("scrapeEntry")) {
+      const extensionReady = await this._scrapeExtensionReady();
+      if (!extensionReady) {
+        return this._createSkippedProviderResult(provider, "payload", []);
+      }
+
       const hookedPaperEntityDrafts =
         await this._hookService.transformhookPoint<any[], object[]>(
           "scrapeEntry",
@@ -570,6 +575,13 @@ export class ScrapeService extends Eventable<{}> {
   }
 
   private async _scrapeExtensionReady() {
+    if (
+      !globalThis.PLAPILocal?.serviceRPCService?.waitForAPI ||
+      !globalThis.PLExtAPI?.extensionManagementService
+    ) {
+      return true;
+    }
+
     const extensionAPIExposed = await PLAPILocal.serviceRPCService.waitForAPI(
       Process.extension,
       "PLExtAPI",
@@ -646,8 +658,6 @@ export class ScrapeService extends Eventable<{}> {
         force
       );
     }
-
-    await this._scrapeExtensionReady();
 
     const jobID = Math.random().toString(36).substring(7);
     const results: Entity[] = [...directPaperEntityDrafts];

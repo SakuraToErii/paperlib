@@ -5,8 +5,10 @@ export type ScrapeSeedKind = "entry-payload" | "entity-draft";
 export type ScrapeMatchBasis =
   | "payload"
   | "paper-entity"
+  | "bibtex"
   | "doi"
   | "arxiv"
+  | "pdf"
   | "title"
   | "url"
   | "unknown";
@@ -40,6 +42,11 @@ export interface ScrapeProviderResult<TData> {
   complete?: boolean;
   warnings: string[];
   diagnostics?: Record<string, unknown>;
+}
+
+export interface ScrapeEntryDraftGroup {
+  payloadIndex: number;
+  drafts: Entity[];
 }
 
 export interface ScrapeMergeContext {

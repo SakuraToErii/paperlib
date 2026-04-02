@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { Entity, EntityType } from "@/models/entity";
 
 import {
+  ScrapeEntryDraftGroup,
   ScrapeProviderDescriptor,
   ScrapeProviderResult,
 } from "./scrape-contract";
@@ -66,7 +67,7 @@ type ReadPdfText = (filePath: string) => Promise<string>;
 
 export interface StableEntryProvider {
   readonly descriptor: ScrapeProviderDescriptor;
-  scrape(payloads: unknown[]): Promise<ScrapeProviderResult<Entity[]>>;
+  scrape(payloads: unknown[]): Promise<ScrapeProviderResult<ScrapeEntryDraftGroup[]>>;
 }
 
 interface StableEntryProviderOptions {
@@ -100,13 +101,13 @@ function coerceArray<T>(value: T | T[] | undefined): T[] {
 
 function createResult(
   provider: ScrapeProviderDescriptor,
-  status: ScrapeProviderResult<Entity[]>["status"],
-  basis: ScrapeProviderResult<Entity[]>["basis"],
-  data: Entity[],
+  status: ScrapeProviderResult<ScrapeEntryDraftGroup[]>["status"],
+  basis: ScrapeProviderResult<ScrapeEntryDraftGroup[]>["basis"],
+  data: ScrapeEntryDraftGroup[],
   warnings: string[],
   diagnostics: Record<string, unknown>,
   complete = status === "matched"
-): ScrapeProviderResult<Entity[]> {
+): ScrapeProviderResult<ScrapeEntryDraftGroup[]> {
   return {
     provider,
     status,
@@ -239,7 +240,7 @@ function createFileSupplementaries(fileURL: string) {
   if (!normalizedURL) {
     return {
       defaultSup: undefined,
-      supplementaries: {},
+      supplementaries: {} as Record<string, never>,
     };
   }
 
@@ -253,6 +254,16 @@ function createFileSupplementaries(fileURL: string) {
       },
     },
   };
+}
+
+function assignMainURL(entity: Entity, mainURL?: string) {
+  const normalizedURL = compactWhitespace(mainURL);
+  if (!normalizedURL) {
+    return entity;
+  }
+
+  (entity as Entity & { mainURL?: string }).mainURL = normalizedURL;
+  return entity;
 }
 
 function resolveURL(candidate: string, baseURL?: string) {
@@ -337,7 +348,8 @@ function mapBibtexRecordToEntity(record: CslRecord) {
     compactWhitespace(record.type).toLowerCase().includes("proceedings") ||
     compactWhitespace(record.type).toLowerCase() === "chapter";
 
-  return new Entity({
+  return assignMainURL(
+    new Entity({
     type: inferEntityType(record.type),
     title: compactWhitespace(record.title),
     authors: mapAuthors(record.author || []),
@@ -352,11 +364,12 @@ function mapBibtexRecordToEntity(record: CslRecord) {
     number: compactWhitespace(record.issue),
     pages: compactWhitespace(record.page),
     publisher: compactWhitespace(record.publisher),
-    mainURL: resolveURL(record.URL || ""),
     tags: [],
     folders: [],
     supplementaries: {},
-  });
+    }),
+    resolveURL(record.URL || "")
+  );
 }
 
 function findDOI(value?: string) {
@@ -438,13 +451,15 @@ abstract class BaseStableEntryProvider implements StableEntryProvider {
     this.descriptor = descriptor;
   }
 
-  async scrape(payloads: unknown[]): Promise<ScrapeProviderResult<Entity[]>> {
+  async scrape(
+    payloads: unknown[]
+  ): Promise<ScrapeProviderResult<ScrapeEntryDraftGroup[]>> {
     const warnings: string[] = [];
     let handledCount = 0;
     let matchedCount = 0;
-    const data: Entity[] = [];
+    const data: ScrapeEntryDraftGroup[] = [];
 
-    for (const payload of payloads) {
+    for (const [payloadIndex, payload] of payloads.entries()) {
       if (!this._canHandle(payload)) {
         continue;
       }
@@ -455,7 +470,10 @@ abstract class BaseStableEntryProvider implements StableEntryProvider {
         const entries = await this._scrapePayload(payload);
         if (entries.length > 0) {
           matchedCount += 1;
-          data.push(...entries.map((entry) => new Entity(entry)));
+          data.push({
+            payloadIndex,
+            drafts: entries.map((entry) => new Entity(entry)),
+          });
         }
       } catch (error) {
         warnings.push(
@@ -483,7 +501,7 @@ abstract class BaseStableEntryProvider implements StableEntryProvider {
     );
   }
 
-  protected abstract _basis(): ScrapeProviderResult<Entity[]>["basis"];
+  protected abstract _basis(): ScrapeProviderResult<ScrapeEntryDraftGroup[]>["basis"];
   protected abstract _canHandle(payload: unknown): boolean;
   protected abstract _scrapePayload(payload: unknown): Promise<Entity[]>;
 }
@@ -493,7 +511,7 @@ export class BibtexEntryProvider extends BaseStableEntryProvider {
 
   constructor(options: StableEntryProviderOptions = {}) {
     super({
-      id: "builtin:bibtex-entry",
+      id: "builtin:bibtex",
       kind: "entry",
       label: "Builtin BibTeX entry provider",
       priority: 10,
@@ -502,8 +520,8 @@ export class BibtexEntryProvider extends BaseStableEntryProvider {
     this._readTextFile = options.readTextFile || defaultReadTextFile;
   }
 
-  protected _basis(): ScrapeProviderResult<Entity[]>["basis"] {
-    return "payload";
+  protected _basis(): ScrapeProviderResult<ScrapeEntryDraftGroup[]>["basis"] {
+    return "bibtex";
   }
 
   protected _canHandle(payload: unknown): boolean {
@@ -533,7 +551,7 @@ export class BibtexEntryProvider extends BaseStableEntryProvider {
 export class GenericWebcontentEntryProvider extends BaseStableEntryProvider {
   constructor() {
     super({
-      id: "builtin:webcontent-entry",
+      id: "builtin:html-metadata",
       kind: "entry",
       label: "Builtin generic webcontent metadata provider",
       priority: 20,
@@ -541,7 +559,7 @@ export class GenericWebcontentEntryProvider extends BaseStableEntryProvider {
     });
   }
 
-  protected _basis(): ScrapeProviderResult<Entity[]>["basis"] {
+  protected _basis(): ScrapeProviderResult<ScrapeEntryDraftGroup[]>["basis"] {
     return "url";
   }
 
@@ -641,31 +659,33 @@ export class GenericWebcontentEntryProvider extends BaseStableEntryProvider {
     }
 
     return [
-      new Entity({
-        type:
-          conferenceTitle || publication.toLowerCase().includes("conference")
+      assignMainURL(
+        new Entity({
+          type:
+            conferenceTitle || publication.toLowerCase().includes("conference")
             ? "inproceedings"
             : "article",
-        title,
-        authors,
-        abstract,
-        doi,
-        arxiv,
-        journal: conferenceTitle ? "" : publication,
-        booktitle: conferenceTitle || "",
-        publication,
-        pubTime,
-        year,
-        month,
-        volume,
-        number,
-        pages,
-        publisher,
-        mainURL: pdfURL || url,
-        tags: [],
-        folders: [],
-        supplementaries: {},
-      }),
+          title,
+          authors,
+          abstract,
+          doi,
+          arxiv,
+          journal: conferenceTitle ? "" : publication,
+          booktitle: conferenceTitle || "",
+          publication,
+          pubTime,
+          year,
+          month,
+          volume,
+          number,
+          pages,
+          publisher,
+          tags: [],
+          folders: [],
+          supplementaries: {},
+        }),
+        pdfURL || url
+      ),
     ];
   }
 }
@@ -675,7 +695,7 @@ export class PDFIdentifierBootstrapEntryProvider extends BaseStableEntryProvider
 
   constructor(options: StableEntryProviderOptions = {}) {
     super({
-      id: "builtin:pdf-entry",
+      id: "builtin:pdf-bootstrap",
       kind: "entry",
       label: "Builtin PDF identifier bootstrap provider",
       priority: 30,
@@ -684,8 +704,8 @@ export class PDFIdentifierBootstrapEntryProvider extends BaseStableEntryProvider
     this._readPdfText = options.readPdfText || defaultReadPdfText;
   }
 
-  protected _basis(): ScrapeProviderResult<Entity[]>["basis"] {
-    return "payload";
+  protected _basis(): ScrapeProviderResult<ScrapeEntryDraftGroup[]>["basis"] {
+    return "pdf";
   }
 
   protected _canHandle(payload: unknown): boolean {

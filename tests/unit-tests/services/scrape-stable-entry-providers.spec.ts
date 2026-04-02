@@ -26,17 +26,18 @@ describe("scrape stable entry providers", () => {
 
     expect(result.status).toBe("matched");
     expect(result.data).toHaveLength(1);
-    expect(result.data[0]).toBeInstanceOf(Entity);
-    expect(result.data[0].title).toBe("Paperlib Stable Entry Provider");
-    expect(result.data[0].authors).toBe("Ada Lovelace, Grace Hopper");
-    expect(result.data[0].doi).toBe("10.1000/paperlib-bibtex");
-    expect(result.data[0].booktitle).toBe(
+    expect(result.data[0].payloadIndex).toBe(0);
+    expect(result.data[0].drafts[0]).toBeInstanceOf(Entity);
+    expect(result.data[0].drafts[0].title).toBe("Paperlib Stable Entry Provider");
+    expect(result.data[0].drafts[0].authors).toBe("Ada Lovelace, Grace Hopper");
+    expect(result.data[0].drafts[0].doi).toBe("10.1000/paperlib-bibtex");
+    expect(result.data[0].drafts[0].booktitle).toBe(
       "Proceedings of the Local First Conference"
     );
-    expect(result.data[0].publication).toBe(
+    expect(result.data[0].drafts[0].publication).toBe(
       "Proceedings of the Local First Conference"
     );
-    expect(result.data[0].year).toBe("2026");
+    expect(result.data[0].drafts[0].year).toBe("2026");
   });
 
   it("extracts generic HTML metadata from browser webcontent payloads", async () => {
@@ -66,14 +67,14 @@ describe("scrape stable entry providers", () => {
 
     expect(result.status).toBe("matched");
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].title).toBe("Generic HTML Title");
-    expect(result.data[0].authors).toBe("Ada Lovelace, Grace Hopper");
-    expect(result.data[0].doi).toBe("10.1000/html-doi");
-    expect(result.data[0].publication).toBe("Journal of HTML");
-    expect(result.data[0].journal).toBe("Journal of HTML");
-    expect(result.data[0].abstract).toBe("HTML abstract");
-    expect(result.data[0].pubTime).toBe("2026-04-02");
-    expect(result.data[0].year).toBe("2026");
+    expect(result.data[0].drafts[0].title).toBe("Generic HTML Title");
+    expect(result.data[0].drafts[0].authors).toBe("Ada Lovelace, Grace Hopper");
+    expect(result.data[0].drafts[0].doi).toBe("10.1000/html-doi");
+    expect(result.data[0].drafts[0].publication).toBe("Journal of HTML");
+    expect(result.data[0].drafts[0].journal).toBe("Journal of HTML");
+    expect(result.data[0].drafts[0].abstract).toBe("HTML abstract");
+    expect(result.data[0].drafts[0].pubTime).toBe("2026-04-02");
+    expect(result.data[0].drafts[0].year).toBe("2026");
   });
 
   it("bootstraps DOI/arXiv identifiers from PDF payload text", async () => {
@@ -91,11 +92,11 @@ describe("scrape stable entry providers", () => {
 
     expect(result.status).toBe("matched");
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].title).toBe("Bootstrap Paper");
-    expect(result.data[0].doi).toBe("10.48550/arXiv.2404.01234");
-    expect(result.data[0].arxiv).toBe("2404.01234v2");
-    expect(result.data[0].defaultSup).toBe("main");
-    expect(result.data[0].supplementaries.main.url).toBe(
+    expect(result.data[0].drafts[0].title).toBe("Bootstrap Paper");
+    expect(result.data[0].drafts[0].doi).toBe("10.48550/arXiv.2404.01234");
+    expect(result.data[0].drafts[0].arxiv).toBe("2404.01234v2");
+    expect(result.data[0].drafts[0].defaultSup).toBe("main");
+    expect(result.data[0].drafts[0].supplementaries.main.url).toBe(
       "/Users/testuser/Papers/Bootstrap Paper.pdf"
     );
   });
