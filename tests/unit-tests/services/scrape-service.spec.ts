@@ -1,9 +1,56 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { mergeMetadata } from "../../../app/base/metadata";
 import { Entity } from "../../../app/models/entity";
 import { ScrapeService } from "../../../app/service/services/scrape-service";
 
 describe("ScrapeService PaperEntity bypass compatibility", () => {
+  it("preserves existing relatedPaperIds when metadata refresh omits relation fields", () => {
+    const relatedPaperId = "507f1f77bcf86cd799439099";
+    const origin = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Seed Title",
+      authors: "Seed Author",
+      year: "2024",
+      publication: "arXiv",
+      relatedPaperIds: [relatedPaperId as any],
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    });
+    const draft = new Entity(origin);
+    const scraped = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Refreshed Title",
+      authors: "Refreshed Author",
+      year: "2025",
+      publication: "Nature",
+      relatedPaperIds: [],
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    });
+
+    const { paperEntityDraft } = mergeMetadata(
+      origin as any,
+      draft as any,
+      scraped as any,
+      {
+        title: Number.POSITIVE_INFINITY,
+        authors: Number.POSITIVE_INFINITY,
+        year: Number.POSITIVE_INFINITY,
+        publication: Number.POSITIVE_INFINITY,
+        relatedPaperIds: Number.POSITIVE_INFINITY,
+      },
+      0
+    );
+
+    expect(paperEntityDraft.title).toBe("Refreshed Title");
+    expect(paperEntityDraft.relatedPaperIds.map((id) => `${id}`)).toEqual([
+      relatedPaperId,
+    ]);
+  });
+
   it("rehydrates metadata hook results so title formatting stays intact after hook recovery", async () => {
     const beforeMetadataResult = {
       _id: "507f1f77bcf86cd799439011",

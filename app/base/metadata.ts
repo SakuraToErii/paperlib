@@ -1,5 +1,20 @@
 import { PaperEntity } from "@/models/paper-entity";
 
+const PRESERVED_METADATA_KEYS = new Set([
+  "relatedPaperIds",
+  "tags",
+  "folders",
+  "supplementaries",
+  "defaultSup",
+  "note",
+  "flag",
+  "rating",
+  "addTime",
+  "library",
+  "_partition",
+  "_id",
+]);
+
 export function isMetadataCompleted(paperEntityDraft: PaperEntity): boolean {
   const completed =
     paperEntityDraft.title != "" &&
@@ -42,13 +57,18 @@ export function mergeMetadata(
     (!isPreprint(scrapedpaperEntity) && !isPreprint(paperEntityDraft))
   ) {
     for (const key of Object.keys(scrapedpaperEntity)) {
+      const shouldPreserveExistingValue = PRESERVED_METADATA_KEYS.has(key);
+      const nextValue = shouldPreserveExistingValue
+        ? paperEntityDraft[key]
+        : scrapedpaperEntity[key];
+
       if (
-        scrapedpaperEntity[key] &&
-        scrapedpaperEntity[key] !== "" &&
+        nextValue &&
+        nextValue !== "" &&
         mergePriorityLevel[key] > scraperIndex &&
-        originPaperEntityDraft[key] !== scrapedpaperEntity[key]
+        originPaperEntityDraft[key] !== nextValue
       ) {
-        paperEntityDraft[key] = scrapedpaperEntity[key];
+        paperEntityDraft[key] = nextValue;
         mergePriorityLevel[key] = scraperIndex;
       }
     }
