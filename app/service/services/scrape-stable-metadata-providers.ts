@@ -123,7 +123,7 @@ function cloneEntityWithMetadata(
 
   for (const [key, value] of Object.entries(metadata)) {
     if (value !== undefined && value !== null && value !== "") {
-      (draft as Record<string, unknown>)[key] = value;
+      (draft as unknown as Record<string, unknown>)[key] = value;
     }
   }
 
