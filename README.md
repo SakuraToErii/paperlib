@@ -89,6 +89,80 @@ See [here](https://paperlib.app/en/download-linux.html).
 
 This fork adds an Obsidian-style local-folder workflow, paper relations, and a paper graph view. The steps below are intended for local manual testing during development and for testing the feature branch on another machine.
 
+## Fork Roadmap Snapshot
+
+This fork is being developed as a local-first Paperlib variant focused on filesystem-backed organization, paper-to-paper relations, graph navigation, and a durable built-in scraping/import architecture.
+
+### Current status
+
+Already implemented on this branch:
+- Obsidian-style local folder workflow, with folder semantics aligned to real local directories
+- paper-to-paper relations stored on the current `relatedPaperIds` model
+- graph view with paper-only nodes, publication-time-derived edge direction, relation-count-driven node sizing, and folder-family-based coloring
+- UI polish for graph interactions and related-papers workflows
+- Phase 1 local-first hardening of:
+  - local database and persistence contracts
+  - relation integrity behavior and update preservation
+  - folder/file mutation behavior and managed-file path safety
+- Phase 2 architecture groundwork for internal scraping/import refactoring:
+  - scrape architecture contract docs
+  - provider inventory and migration priorities
+  - safe merge/update policy docs
+  - initial internal scrape resolver/provider/merge scaffolding in the service layer
+
+### Short-term plan
+
+1. Finish the durable internal scraping/import architecture
+- Continue replacing plugin-style core scraping behavior with internal provider/resolver/merge/persistence seams.
+- Internalize stable sources first:
+  - DOI
+  - arXiv
+  - BibTeX
+  - generic HTML metadata
+- Keep volatile site-specific scrapers isolated and modular.
+- Preserve local-managed fields by default during refresh/import:
+  - `relatedPaperIds`
+  - folders
+  - tags
+  - notes
+  - managed files / file placement
+
+2. Keep hardening the local-first data model
+- Continue reducing legacy persistence residue.
+- Prepare the migration seam from `relatedPaperIds` adjacency lists to a future edge-based relation model.
+- Add more regression coverage around local folder/file edge cases and scraping update flows.
+
+### Long-term plan
+
+1. High-performance local database and graph queries
+- Migrate from adjacency-list relation storage toward canonical edge storage.
+- Add dedicated relation/graph read APIs.
+- Reduce whole-library scans and improve large-library performance.
+
+2. Local-first library portability instead of app-level cloud sync
+- Prioritize using iCloud / OneDrive / Dropbox / Syncthing style folder replication for the library.
+- Keep Paperlib semantics local-first rather than depending on app-managed cloud sync.
+- Improve resilience and repair tooling for cloud-folder-backed local libraries.
+
+3. Obsidian-inspired high-performance graph experience
+- Expand from the current graph view to more scalable graph data services.
+- Add stronger neighborhood, filtering, and incremental graph-read capabilities.
+- Keep the graph useful on large literature libraries without sacrificing the app’s current visual style.
+
+### Current branch notes
+
+Working branch:
+- `feat/obsidian-folder-graph`
+
+Recent planning/reference docs for this fork:
+- `docs/plans/phase1-local-db-contract.md`
+- `docs/plans/phase1-legacy-persistence-audit.md`
+- `docs/plans/phase1-edge-migration-seam.md`
+- `docs/plans/phase1-readiness-summary.md`
+- `docs/plans/phase2-scrape-architecture-contract.md`
+- `docs/plans/phase2-scrape-provider-inventory.md`
+- `docs/plans/phase2-safe-merge-policy.md`
+
 ### 1. Get the branch and install dependencies
 
 If you are testing on another machine, clone your fork and switch to this branch first:
