@@ -27,21 +27,25 @@ The next meaningful bottleneck is no longer bootstrap correctness; it is graph a
 ### A. Introduce a relation read gateway before changing storage
 
 Goal:
+
 - stop adding new renderer/service reads that depend directly on `entity.relatedPaperIds`
 
 Start from:
+
 - `app/service/services/paper-service.ts`
 - `app/renderer/ui/main-view/detail-view/components/related-papers.vue`
 - `app/renderer/ui/main-view/data-view/paper-data-view.vue`
 - `app/renderer/utils/paper-graph.ts`
 
 Expected outcome:
+
 - detail view, graph derivation, and batch enablement read through one query surface
 - edge-storage migration can happen behind that surface later
 
 ### B. Keep current graph semantics while reducing whole-entity coupling
 
 Must preserve:
+
 - graph derives from the active filtered entity set
 - missing targets do not create dangling edges
 - self-links stay ignored
@@ -49,6 +53,7 @@ Must preserve:
 - edge direction remains render-derived from publication time
 
 Candidate next seam:
+
 - `buildRelationSubgraph(entityIds)`
 - `hasRelationBetween(a, b)`
 - `listRelatedPaperIds(paperId)`
@@ -56,9 +61,11 @@ Candidate next seam:
 ### C. Prepare a migration-safe local DB path
 
 Goal:
+
 - make future graph/relation performance work independent from legacy Realm sync baggage
 
 Priority questions:
+
 1. Which active callers still require `_partition` / Realm-sync-era assumptions?
 2. Which query paths are doing repeated whole-entity scans that can be narrowed once a relation gateway exists?
 3. Which tests currently encode inline-list assumptions and therefore need preservation-first refactors?
