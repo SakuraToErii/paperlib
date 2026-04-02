@@ -27,8 +27,29 @@ export class ScrapeProviderRegistry {
     this._providersByKind.set(provider.kind, providersWithoutCurrent);
   }
 
-  list(kind: ScrapeProviderKind): ScrapeProviderDescriptor[] {
-    return [...(this._providersByKind.get(kind) || [])];
+  list(
+    kind: ScrapeProviderKind,
+    requestedProviderIds: string[] = []
+  ): ScrapeProviderDescriptor[] {
+    const providers = [...(this._providersByKind.get(kind) || [])];
+    if (requestedProviderIds.length === 0) {
+      return providers;
+    }
+
+    const requestedProviderIdSet = new Set(requestedProviderIds);
+    return providers.filter((provider) => {
+      if (provider.id.startsWith("hook:")) {
+        return true;
+      }
+
+      if (requestedProviderIdSet.has(provider.id)) {
+        return true;
+      }
+
+      return (provider.aliases || []).some((alias) =>
+        requestedProviderIdSet.has(alias)
+      );
+    });
   }
 
   get(

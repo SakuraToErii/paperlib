@@ -21,6 +21,7 @@ export interface ScrapeProviderDescriptor {
   kind: ScrapeProviderKind;
   label?: string;
   priority?: number;
+  aliases?: string[];
 }
 
 export interface ScrapeSeed {

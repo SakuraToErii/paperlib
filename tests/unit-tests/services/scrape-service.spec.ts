@@ -230,7 +230,7 @@ describe("ScrapeService seam strengthening", () => {
 
     expect(
       executeMetadataProviderSpy.mock.calls.map(([provider]) => provider.id)
-    ).toEqual(["builtin:doi", "builtin:arxiv", "hook:metadata"]);
+    ).toEqual(["hook:metadata"]);
     expect(executeMetadataProviderSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "hook:metadata",
