@@ -99,6 +99,74 @@ describe("DatabaseService.initialize bootstrap support", () => {
     expect(PLAPILocal.paperService.create).not.toHaveBeenCalled();
   });
 
+  it("skips bootstrap when flexible sync is enabled", async () => {
+    const { existsSync } = await import("fs");
+    const { listAllFiles } = await import("../../../app/base/url");
+    const { DatabaseService } = await import(
+      "../../../app/service/services/database-service"
+    );
+
+    vi.mocked(existsSync).mockReturnValue(false);
+    globalThis.PLMainAPI.preferenceService.get = vi.fn(async (key: string) => {
+      switch (key) {
+        case "appLibFolder":
+          return "/Users/testuser/Paperlib";
+        case "isFlexibleSync":
+          return true;
+        case "syncFileStorage":
+          return "local";
+        default:
+          return "";
+      }
+    });
+
+    const initRealm = vi.fn(async () => undefined);
+    const service = new DatabaseService({
+      initRealm,
+      on: vi.fn(),
+    } as any);
+
+    await service.initialize();
+
+    expect(initRealm).toHaveBeenCalledWith(true);
+    expect(listAllFiles).not.toHaveBeenCalled();
+    expect(PLAPILocal.paperService.create).not.toHaveBeenCalled();
+  });
+
+  it("skips bootstrap when file storage is not local", async () => {
+    const { existsSync } = await import("fs");
+    const { listAllFiles } = await import("../../../app/base/url");
+    const { DatabaseService } = await import(
+      "../../../app/service/services/database-service"
+    );
+
+    vi.mocked(existsSync).mockReturnValue(false);
+    globalThis.PLMainAPI.preferenceService.get = vi.fn(async (key: string) => {
+      switch (key) {
+        case "appLibFolder":
+          return "/Users/testuser/Paperlib";
+        case "isFlexibleSync":
+          return false;
+        case "syncFileStorage":
+          return "dropbox";
+        default:
+          return "";
+      }
+    });
+
+    const initRealm = vi.fn(async () => undefined);
+    const service = new DatabaseService({
+      initRealm,
+      on: vi.fn(),
+    } as any);
+
+    await service.initialize();
+
+    expect(initRealm).toHaveBeenCalledWith(true);
+    expect(listAllFiles).not.toHaveBeenCalled();
+    expect(PLAPILocal.paperService.create).not.toHaveBeenCalled();
+  });
+
   it("reuses the reserved bootstrap promise so concurrent initialize calls import once", async () => {
     const { existsSync } = await import("fs");
     const { listAllFiles } = await import("../../../app/base/url");
