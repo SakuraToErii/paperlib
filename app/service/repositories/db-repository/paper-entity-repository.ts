@@ -4,8 +4,17 @@ import Realm from "realm";
 import { Eventable } from "@/base/event";
 import { createDecorator } from "@/base/injection/injection";
 import { CategorizerType, ICategorizerCollection } from "@/models/categorizer";
+import {
+  Entity,
+  IEntityCollection,
+  IEntityObject,
+  IEntityRealmObject,
+} from "@/models/entity";
 import { OID } from "@/models/id";
-import { IEntityCollection, IEntityObject, IEntityRealmObject, Entity } from "@/models/entity";
+import {
+  normalizeRelationIds,
+  toObjectIds,
+} from "@/service/services/paper-relation-integrity";
 import {
   CategorizerRepository,
   ICategorizerRepository,
@@ -105,7 +114,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
         if (deletionCount > 0 || insertionCount > 0 || modificationCount > 0) {
           this.fire("updated");
         }
-      })
+      });
 
       realm.entityListened = true;
     }
@@ -163,9 +172,9 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
     paperEntity.rating = paperEntity.rating || 0;
     paperEntity.tags = paperEntity.tags || [];
     paperEntity.folders = paperEntity.folders || [];
-    paperEntity.relatedPaperIds = Array.from(
-      new Set((paperEntity.relatedPaperIds || []).map((id) => `${id}`))
-    ).map((id) => new ObjectId(id));
+    paperEntity.relatedPaperIds = toObjectIds(
+      normalizeRelationIds(paperEntity.relatedPaperIds as any, paperEntity._id)
+    );
     paperEntity.flag = paperEntity.flag || false;
 
     return paperEntity;
@@ -328,9 +337,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
   delete(realm: Realm, ids?: OID[], paperEntitys?: IEntityCollection) {
     return realm.safeWrite(() => {
       if (paperEntitys) {
-        ids = paperEntitys.map(
-          (paperEntity: IEntityObject) => paperEntity._id
-        );
+        ids = paperEntitys.map((paperEntity: IEntityObject) => paperEntity._id);
       }
       if (ids) {
         const idsQuery = ids
@@ -340,11 +347,15 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
         const toBeDeleted = realm
           .objects<Entity>("Entity")
           .filtered(`(${idsQuery})`);
-        const deletedIdSet = new Set(toBeDeleted.map((paperEntity) => `${paperEntity._id}`));
+        const deletedIdSet = new Set(
+          toBeDeleted.map((paperEntity) => `${paperEntity._id}`)
+        );
 
         const toBeDeletedFiles = toBeDeleted
           .map((paperEntity) => {
-            return Object.values(paperEntity.supplementaries).map(sup => sup.url).filter((url) => url?.startsWith("file://")) as string[];
+            return Object.values(paperEntity.supplementaries)
+              .map((sup) => sup.url)
+              .filter((url) => url?.startsWith("file://")) as string[];
           })
           .flat();
 

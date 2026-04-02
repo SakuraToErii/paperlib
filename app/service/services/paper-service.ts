@@ -1,12 +1,11 @@
 import path from "path";
 
-import { ObjectId } from "bson";
 import { chunkRun } from "@/base/chunk";
 import { errorcatching } from "@/base/error";
 import { Eventable } from "@/base/event";
 import { PaperFilterOptions } from "@/base/filter";
-import { createDecorator } from "@/base/injection/injection";
 import { normalizeFolderPath } from "@/base/folder";
+import { createDecorator } from "@/base/injection/injection";
 import { ILogService, LogService } from "@/common/services/log-service";
 import { ProcessingKey, processing } from "@/common/utils/processing";
 import {
@@ -18,6 +17,7 @@ import {
 import { Entity, IEntityCollection, IEntityObject } from "@/models/entity";
 import { OID } from "@/models/id";
 import { DatabaseCore, IDatabaseCore } from "@/service/services/database/core";
+import { ObjectId } from "bson";
 
 import { uid } from "@/base/misc";
 import { getDefaultSupplementaryFileURL, getProtocol } from "@/base/url";
@@ -29,6 +29,7 @@ import {
 import { CacheService, ICacheService } from "./cache-service";
 import { CategorizerService, ICategorizerService } from "./categorizer-service";
 import { FileService, IFileService } from "./file-service";
+import { normalizeRelationIds, toObjectIds } from "./paper-relation-integrity";
 import { ISchedulerService, SchedulerService } from "./scheduler-service";
 import { IScrapeService, ScrapeService } from "./scrape-service";
 
@@ -55,34 +56,44 @@ export const IPaperService = createDecorator("paperService");
  * Service for paper entity operations.
  */
 export class PaperService extends Eventable<IPaperServiceState> {
-  private _normalizeExistingRelatedIds(relatedIds: OID[] | undefined, selfId: string) {
-    return Array.from(
-      new Set(
-        (relatedIds || [])
-          .map((id) => `${id}`)
-          .filter((id) => ObjectId.isValid(id) && id !== selfId)
-      )
-    );
-  }
-
-  private _buildRelatedObjectIds(relatedIds: string[]) {
-    return relatedIds.map((id) => new ObjectId(id)) as any;
-  }
-
   private _syncPaperRelationIds(
     paper: Entity,
     nextRelatedIds: Iterable<string>
   ) {
-    const normalizedPaperId = `${paper._id}`;
-    const normalizedRelatedIds = Array.from(
-      new Set(
-        Array.from(nextRelatedIds).filter(
-          (id) => ObjectId.isValid(id) && id !== normalizedPaperId
-        )
-      )
+    paper.relatedPaperIds = toObjectIds(
+      normalizeRelationIds(nextRelatedIds, `${paper._id}`)
     );
+  }
 
-    paper.relatedPaperIds = this._buildRelatedObjectIds(normalizedRelatedIds);
+  private _repairPapersRelationIntegrity(papers: Entity[]) {
+    const paperMap = new Map<string, Entity>();
+
+    for (const paper of papers) {
+      paperMap.set(`${paper._id}`, paper);
+    }
+
+    for (const paper of paperMap.values()) {
+      const paperId = `${paper._id}`;
+      const nextIds = normalizeRelationIds(
+        paper.relatedPaperIds as any,
+        paperId
+      ).filter((relatedId) => paperMap.has(relatedId));
+
+      for (const relatedId of nextIds) {
+        const relatedPaper = paperMap.get(relatedId);
+        if (!relatedPaper) {
+          continue;
+        }
+
+        const reverseIds = new Set(
+          normalizeRelationIds(relatedPaper.relatedPaperIds as any, relatedId)
+        );
+        reverseIds.add(paperId);
+        this._syncPaperRelationIds(relatedPaper, reverseIds);
+      }
+
+      this._syncPaperRelationIds(paper, nextIds);
+    }
   }
 
   constructor(
@@ -325,7 +336,11 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
     // Only perform a full folder rebuild when draft semantics can affect the
     // derived folder tree. Metadata-only edits should leave the existing tree intact.
-    if (successfulEntityDrafts.some((paperEntityDraft) => entityHasFolderSemanticChanges(paperEntityDraft))) {
+    if (
+      successfulEntityDrafts.some((paperEntityDraft) =>
+        entityHasFolderSemanticChanges(paperEntityDraft)
+      )
+    ) {
       await this._categorizerService.syncFoldersWithLibrary();
     }
 
@@ -450,9 +465,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
       (ids
         ? Array.from(this._paperEntityRepository.loadByIds(realm, ids))
         : undefined);
-    const targetPaperIds = (ids || targetPaperEntities?.map((entity) => entity._id))?.map(
-      (id) => `${id}`
-    );
+    const targetPaperIds = (
+      ids || targetPaperEntities?.map((entity) => entity._id)
+    )?.map((id) => `${id}`);
 
     if (!fromSync) {
       // FIXME: write log only if using sync.
@@ -466,7 +481,12 @@ export class PaperService extends Eventable<IPaperServiceState> {
       realm.safeWrite(() => {
         const targetPaperIdSet = new Set(targetPaperIds);
         const allPaperEntities = Array.from(
-          this._paperEntityRepository.load(realm, "", "title", "desc") as Iterable<Entity>
+          this._paperEntityRepository.load(
+            realm,
+            "",
+            "title",
+            "desc"
+          ) as Iterable<Entity>
         );
 
         for (const paperEntity of allPaperEntities) {
@@ -478,7 +498,10 @@ export class PaperService extends Eventable<IPaperServiceState> {
             (relatedId) => !targetPaperIdSet.has(`${relatedId}`)
           );
 
-          if (relatedPaperIds.length !== (paperEntity.relatedPaperIds || []).length) {
+          if (
+            relatedPaperIds.length !==
+            (paperEntity.relatedPaperIds || []).length
+          ) {
             paperEntity.relatedPaperIds = relatedPaperIds.map(
               (relatedId) => new ObjectId(`${relatedId}`)
             ) as any;
@@ -568,8 +591,11 @@ export class PaperService extends Eventable<IPaperServiceState> {
     // );
 
     const scrapedPaperEntityDrafts = urlList.map((url) => {
-      const filePath = url.startsWith("file://") ? decodeURIComponent(new URL(url).pathname) : url;
-      const fallbackTitle = path.basename(filePath, path.extname(filePath)) || "Imported paper";
+      const filePath = url.startsWith("file://")
+        ? decodeURIComponent(new URL(url).pathname)
+        : url;
+      const fallbackTitle =
+        path.basename(filePath, path.extname(filePath)) || "Imported paper";
       const paperEntityDraft = new Entity({
         title: fallbackTitle,
         year: "2025",
@@ -640,12 +666,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
       throw new Error(`Invalid paper id: ${paperId}`);
     }
 
-    const requestedRelatedIds = Array.from(
-      new Set(
-        relatedIds
-          .map((id) => `${id}`)
-          .filter((id) => ObjectId.isValid(id) && id !== normalizedPaperId)
-      )
+    const requestedRelatedIds = normalizeRelationIds(
+      relatedIds,
+      normalizedPaperId
     );
 
     if (!fromSync) {
@@ -659,47 +682,33 @@ export class PaperService extends Eventable<IPaperServiceState> {
     const realm = await this._databaseCore.realm();
 
     realm.safeWrite(() => {
-      const targetPaper = this._paperEntityRepository.loadByIds(realm, [normalizedPaperId])[0] as Entity;
+      const targetPaper = this._paperEntityRepository.loadByIds(realm, [
+        normalizedPaperId,
+      ])[0] as Entity;
       if (!targetPaper) {
         throw new Error(`Paper not found: ${paperId}`);
       }
 
-      const existingRelatedPapers = Array.from(
+      const directlyRelatedPapers = Array.from(
         this._paperEntityRepository.loadByIds(realm, requestedRelatedIds)
       ) as Entity[];
-      const normalizedRelatedIds = existingRelatedPapers.map((paper) => `${paper._id}`);
-      const nextRelatedIdSet = new Set(normalizedRelatedIds);
-      const previouslyRelatedIds = new Set(
-        this._normalizeExistingRelatedIds(targetPaper.relatedPaperIds as any, normalizedPaperId)
+      const previouslyRelatedIds = normalizeRelationIds(
+        targetPaper.relatedPaperIds as any,
+        normalizedPaperId
       );
+      const previouslyRelatedPapers = Array.from(
+        this._paperEntityRepository.loadByIds(realm, previouslyRelatedIds)
+      ) as Entity[];
 
-      this._syncPaperRelationIds(targetPaper, normalizedRelatedIds);
-
-      for (const relatedPaper of existingRelatedPapers) {
-        const relatedPaperId = `${relatedPaper._id}`;
-        const nextIds = new Set(
-          this._normalizeExistingRelatedIds(relatedPaper.relatedPaperIds as any, relatedPaperId)
-        );
-        nextIds.add(normalizedPaperId);
-        this._syncPaperRelationIds(relatedPaper, nextIds);
-      }
-
-      for (const previouslyRelatedId of previouslyRelatedIds) {
-        if (nextRelatedIdSet.has(previouslyRelatedId)) {
-          continue;
-        }
-
-        const relatedPaper = this._paperEntityRepository.loadByIds(realm, [previouslyRelatedId])[0] as Entity;
-        if (!relatedPaper) {
-          continue;
-        }
-
-        const nextIds = new Set(
-          this._normalizeExistingRelatedIds(relatedPaper.relatedPaperIds as any, `${relatedPaper._id}`)
-        );
-        nextIds.delete(normalizedPaperId);
-        this._syncPaperRelationIds(relatedPaper, nextIds);
-      }
+      this._syncPaperRelationIds(
+        targetPaper,
+        directlyRelatedPapers.map((paper) => `${paper._id}`)
+      );
+      this._repairPapersRelationIntegrity([
+        targetPaper,
+        ...directlyRelatedPapers,
+        ...previouslyRelatedPapers,
+      ]);
     });
   }
 
@@ -734,7 +743,7 @@ export class PaperService extends Eventable<IPaperServiceState> {
       for (const paper of targetPapers) {
         const paperId = `${paper._id}`;
         const nextIds = new Set(
-          this._normalizeExistingRelatedIds(paper.relatedPaperIds as any, paperId)
+          normalizeRelationIds(paper.relatedPaperIds as any, paperId)
         );
 
         for (const relatedPaperId of existingPaperIds) {
@@ -745,6 +754,8 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
         this._syncPaperRelationIds(paper, nextIds);
       }
+
+      this._repairPapersRelationIntegrity(targetPapers);
     });
   }
 
@@ -774,17 +785,21 @@ export class PaperService extends Eventable<IPaperServiceState> {
       const targetPapers = Array.from(
         this._paperEntityRepository.loadByIds(realm, normalizedPaperIds)
       ) as Entity[];
-      const targetPaperIdSet = new Set(targetPapers.map((paper) => `${paper._id}`));
+      const targetPaperIdSet = new Set(
+        targetPapers.map((paper) => `${paper._id}`)
+      );
 
       for (const paper of targetPapers) {
         const paperId = `${paper._id}`;
-        const nextIds = this._normalizeExistingRelatedIds(
+        const nextIds = normalizeRelationIds(
           paper.relatedPaperIds as any,
           paperId
         ).filter((relatedPaperId) => !targetPaperIdSet.has(relatedPaperId));
 
         this._syncPaperRelationIds(paper, nextIds);
       }
+
+      this._repairPapersRelationIntegrity(targetPapers);
     });
   }
 
