@@ -164,7 +164,12 @@ describe("ScrapeService seam strengthening", () => {
 
     expect(
       executeEntryProviderSpy.mock.calls.map(([provider]) => provider.id)
-    ).toEqual(["hook:entry"]);
+    ).toEqual([
+      "builtin:bibtex-entry",
+      "builtin:webcontent-entry",
+      "builtin:pdf-entry",
+      "hook:entry",
+    ]);
     expect(executeEntryProviderSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "hook:entry",
@@ -710,15 +715,11 @@ describe("ScrapeService PaperEntity bypass compatibility", () => {
       false
     );
 
-    expect(waitForAPI).toHaveBeenCalledTimes(1);
-    expect(isOfficialScrapeExtensionInstalled).toHaveBeenCalledTimes(1);
-    expect(hookService.transformhookPoint).toHaveBeenCalledWith(
-      "scrapeEntry",
-      600000,
-      [entryPayload]
-    );
+    expect(waitForAPI).not.toHaveBeenCalled();
+    expect(isOfficialScrapeExtensionInstalled).not.toHaveBeenCalled();
+    expect(hookService.transformhookPoint).not.toHaveBeenCalled();
     expect(results).toHaveLength(2);
     expect(results[0].title).toBe("Direct Draft Title");
-    expect(results[1].title).toBe("Entry Scraped Title");
+    expect(results[1].arxiv).toBe("2401.00001");
   });
 });
