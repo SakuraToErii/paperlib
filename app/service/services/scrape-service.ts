@@ -7,7 +7,6 @@ import { ProcessingKey, processing } from "@/common/utils/processing";
 import { Entity, IEntityCollection } from "@/models/entity";
 
 import { HookService, IHookService } from "./hook-service";
-import { executeBuiltinMetadataProvider } from "./scrape-builtin-metadata";
 import {
   ScrapeEntryRequest,
   ScrapeFuzzyRequest,
@@ -24,6 +23,10 @@ import {
   MetadataMergePolicy,
 } from "./scrape-merge-policy";
 import { ScrapeProviderRegistry } from "./scrape-provider-registry";
+import {
+  createStableMetadataProviders,
+  StableMetadataProvider,
+} from "./scrape-stable-metadata-providers";
 import {
   DefaultScrapeInputResolver,
   PaperEntityInputResolver,
@@ -56,6 +59,7 @@ export class ScrapeService extends Eventable<{}> {
   private readonly _inputResolverRegistry: ScrapeInputResolverRegistry;
   private readonly _providerRegistry: ScrapeProviderRegistry;
   private readonly _metadataMergePolicy: MetadataMergePolicy;
+  private readonly _stableMetadataProviders: Map<string, StableMetadataProvider>;
 
   private _isPaperEntityPayload(
     payload: unknown
@@ -72,9 +76,10 @@ export class ScrapeService extends Eventable<{}> {
   }
 
   protected _listProviders(
-    kind: ScrapeProviderKind
+    kind: ScrapeProviderKind,
+    requestedProviderIds: string[] = []
   ): ScrapeProviderDescriptor[] {
-    const providers = this._providerRegistry.list(kind);
+    const providers = this._providerRegistry.list(kind, requestedProviderIds);
     if (providers.length === 0) {
       throw new Error(`No scrape provider registered for ${kind}.`);
     }
@@ -117,30 +122,38 @@ export class ScrapeService extends Eventable<{}> {
     provider: ScrapeProviderDescriptor,
     request: ScrapeMetadataRequest
   ): Promise<ScrapeMetadataProviderExecution> {
-    switch (provider.id) {
-      case "builtin:doi":
-      case "builtin:arxiv":
-        return executeBuiltinMetadataProvider(provider, request);
-      case "hook:metadata":
-        return this._executeHookMetadataProvider(provider, request);
-      default:
-        return Promise.resolve({
-          result: this._createSkippedProviderResult(
-            provider,
-            request.drafts.some((draft) => !!draft.doi)
-              ? "doi"
-              : request.drafts.some((draft) => !!draft.arxiv)
-              ? "arxiv"
-              : "paper-entity",
-            request.drafts.map((draft) => new Entity(draft))
-          ),
-          request: {
-            drafts: request.drafts.map((draft) => new Entity(draft)),
-            scrapers: [...request.scrapers],
-            force: request.force,
-          },
-        });
+    const stableMetadataProvider = this._stableMetadataProviders.get(provider.id);
+    if (stableMetadataProvider) {
+      return stableMetadataProvider.scrape(request.drafts).then((result) => ({
+        result,
+        request: {
+          drafts: request.drafts.map((draft) => new Entity(draft)),
+          scrapers: [...request.scrapers],
+          force: request.force,
+        },
+      }));
     }
+
+    if (provider.id === "hook:metadata") {
+      return this._executeHookMetadataProvider(provider, request);
+    }
+
+    return Promise.resolve({
+      result: this._createSkippedProviderResult(
+        provider,
+        request.drafts.some((draft) => !!draft.doi)
+          ? "doi"
+          : request.drafts.some((draft) => !!draft.arxiv)
+          ? "arxiv"
+          : "paper-entity",
+        request.drafts.map((draft) => new Entity(draft))
+      ),
+      request: {
+        drafts: request.drafts.map((draft) => new Entity(draft)),
+        scrapers: [...request.scrapers],
+        force: request.force,
+      },
+    });
   }
 
   protected _executeFuzzyProvider(
@@ -204,23 +217,20 @@ export class ScrapeService extends Eventable<{}> {
       new DefaultScrapeInputResolver(),
     ]);
     this._providerRegistry = new ScrapeProviderRegistry();
+    this._stableMetadataProviders = new Map(
+      createStableMetadataProviders().map((provider) => [
+        provider.descriptor.id,
+        provider,
+      ])
+    );
     this._metadataMergePolicy = new DefaultMetadataMergePolicy();
     this._registerBuiltinProviders();
   }
 
   private _registerBuiltinProviders() {
-    this._providerRegistry.register({
-      id: "builtin:doi",
-      kind: "metadata",
-      label: "Built-in DOI metadata provider",
-      priority: 10,
-    });
-    this._providerRegistry.register({
-      id: "builtin:arxiv",
-      kind: "metadata",
-      label: "Built-in arXiv metadata provider",
-      priority: 20,
-    });
+    for (const provider of this._stableMetadataProviders.values()) {
+      this._providerRegistry.register(provider.descriptor);
+    }
     this._providerRegistry.register({
       id: "hook:entry",
       kind: "entry",
@@ -455,7 +465,8 @@ export class ScrapeService extends Eventable<{}> {
     };
 
     for (const [providerIndex, provider] of this._listProviders(
-      "metadata"
+      "metadata",
+      request.scrapers
     ).entries()) {
       const execution = await this._executeMetadataProvider(
         provider,

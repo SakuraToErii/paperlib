@@ -26,6 +26,42 @@ describe("ScrapeService Slice 2 scaffolding", () => {
     expect(registry.get("metadata", "slow")?.label).toBe("replaced");
   });
 
+  it("filters registry providers by requested ids while keeping hook fallback available", () => {
+    const registry = new ScrapeProviderRegistry();
+
+    registry.register({
+      id: "builtin:doi",
+      kind: "metadata",
+      priority: 10,
+      aliases: ["doi"],
+    });
+    registry.register({
+      id: "builtin:arxiv",
+      kind: "metadata",
+      priority: 20,
+      aliases: ["arxiv"],
+    });
+    registry.register({
+      id: "hook:metadata",
+      kind: "metadata",
+      priority: 100,
+    });
+
+    expect(registry.list("metadata", ["doi"])).toEqual([
+      {
+        id: "builtin:doi",
+        kind: "metadata",
+        priority: 10,
+        aliases: ["doi"],
+      },
+      {
+        id: "hook:metadata",
+        kind: "metadata",
+        priority: 100,
+      },
+    ]);
+  });
+
   it("merge policy delegates to mergeMetadata while allowing force refresh priority override", () => {
     const policy = new DefaultMetadataMergePolicy();
     const origin = new Entity({
@@ -271,6 +307,56 @@ describe("ScrapeService seam strengthening", () => {
     expect(result.authors).toBe("Ada Lovelace");
     expect(result.publication).toBe("Journal of Tests");
     expect(result.doi).toBe("10.1000/test-doi");
+  });
+
+  it("limits builtin metadata dispatch to requested providers while retaining hook fallback", async () => {
+    const hookService = {
+      hasHook: vi.fn(() => false),
+      modifyHookPoint: vi.fn(async (...args: any[]) => args.slice(2)),
+      transformhookPoint: vi.fn(async () => []),
+    };
+    const logService = {
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+      progress: vi.fn(),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          message: {
+            DOI: "10.1000/test-doi",
+            title: ["Resolved DOI Title"],
+            author: [{ given: "Ada", family: "Lovelace" }],
+          },
+        }),
+      })) as any
+    );
+
+    const service = new ScrapeService(hookService as any, logService as any);
+    const executeMetadataProviderSpy = vi.spyOn(
+      service as any,
+      "_executeMetadataProvider"
+    );
+    const seedEntity = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Seed Title",
+      authors: "Seed Author",
+      year: "2024",
+      doi: "10.1000/test-doi",
+      arxiv: "2404.12345v1",
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    });
+
+    await service.scrapeMetadata([seedEntity], ["doi"], true);
+
+    expect(
+      executeMetadataProviderSpy.mock.calls.map(([provider]) => provider.id)
+    ).toEqual(["builtin:doi", "hook:metadata"]);
   });
 
   it("uses the built-in arXiv provider before hook fallback on identifier happy paths", async () => {

@@ -31,7 +31,10 @@ export class ScrapeProviderRegistry {
     return [...(this._providersByKind.get(kind) || [])];
   }
 
-  get(kind: ScrapeProviderKind, providerId: string): ScrapeProviderDescriptor | undefined {
+  get(
+    kind: ScrapeProviderKind,
+    providerId: string
+  ): ScrapeProviderDescriptor | undefined {
     return this._providersByKind
       .get(kind)
       ?.find((provider) => provider.id === providerId);
