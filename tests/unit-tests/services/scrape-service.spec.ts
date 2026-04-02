@@ -78,6 +78,177 @@ describe("ScrapeService Slice 2 scaffolding", () => {
   });
 });
 
+describe("ScrapeService seam strengthening", () => {
+  it("routes scrapeEntry provider selection through the abstraction seam", async () => {
+    const hookService = {
+      hasHook: vi.fn((hookName: string) => hookName === "scrapeEntry"),
+      modifyHookPoint: vi.fn(async (...args: any[]) => args.slice(2)),
+      transformhookPoint: vi.fn(async () => [
+        {
+          _id: "507f1f77bcf86cd799439011",
+          title: "Entry Result",
+          authors: "Test Author",
+          year: "2024",
+          tags: [],
+          folders: [],
+          supplementaries: {},
+        },
+      ]),
+    };
+
+    const logService = {
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+      progress: vi.fn(),
+    };
+
+    const service = new ScrapeService(hookService as any, logService as any);
+    const selectedProvider = {
+      id: "custom:entry",
+      kind: "entry" as const,
+      label: "Custom entry provider",
+      priority: 1,
+    };
+    const selectProviderSpy = vi
+      .spyOn(service as any, "_selectProvider")
+      .mockReturnValue(selectedProvider);
+    const executeEntryProviderSpy = vi.spyOn(service as any, "_executeEntryProvider");
+
+    const results = await service.scrapeEntry([{ url: "https://example.test" }]);
+
+    expect(selectProviderSpy).toHaveBeenCalledWith("entry");
+    expect(executeEntryProviderSpy).toHaveBeenCalledWith(selectedProvider, [
+      { url: "https://example.test" },
+    ]);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("Entry Result");
+  });
+
+  it("routes metadata dispatch through the provider seam and preserves hook behavior", async () => {
+    const metadataDraft = {
+      _id: "507f1f77bcf86cd799439011",
+      title: "Metadata Result",
+      authors: "Updated Author",
+      year: "2025",
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    };
+    const hookService = {
+      hasHook: vi.fn((hookName: string) => hookName === "scrapeMetadata"),
+      modifyHookPoint: vi.fn(async (...args: any[]) => {
+        if (args[0] === "scrapeMetadata") {
+          return [[metadataDraft], args[3], args[4]];
+        }
+        return args.slice(2);
+      }),
+      transformhookPoint: vi.fn(async () => []),
+    };
+
+    const logService = {
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+      progress: vi.fn(),
+    };
+
+    const service = new ScrapeService(hookService as any, logService as any);
+    const selectedProvider = {
+      id: "custom:metadata",
+      kind: "metadata" as const,
+      label: "Custom metadata provider",
+      priority: 1,
+    };
+    const executeMetadataProviderSpy = vi.spyOn(service as any, "_executeMetadataProvider");
+    vi.spyOn(service as any, "_selectProvider").mockReturnValue(selectedProvider);
+
+    const seedEntity = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Seed Title",
+      authors: "Seed Author",
+      year: "2024",
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    });
+
+    const [result] = await service.scrapeMetadata([seedEntity], ["hooked"], true);
+
+    expect(executeMetadataProviderSpy).toHaveBeenCalledWith(
+      selectedProvider,
+      [expect.any(Entity)],
+      ["hooked"],
+      true
+    );
+    expect(result.title).toBe("Metadata Result");
+    expect(result).toBeInstanceOf(Entity);
+  });
+
+  it("delegates merge application through the merge-policy seam", () => {
+    const hookService = {
+      hasHook: vi.fn(() => false),
+      modifyHookPoint: vi.fn(async (...args: any[]) => args.slice(2)),
+      transformhookPoint: vi.fn(async () => []),
+    };
+    const logService = {
+      warn: vi.fn(),
+      info: vi.fn(),
+      error: vi.fn(),
+      progress: vi.fn(),
+    };
+    const service = new ScrapeService(hookService as any, logService as any);
+    const mergeSpy = vi.spyOn(
+      (service as any)._metadataMergePolicy,
+      "merge"
+    );
+    const origin = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Original Title",
+      authors: "Seed Author",
+      year: "2024",
+      publication: "arXiv",
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    });
+    const draft = new Entity(origin);
+    const providerResult = {
+      provider: { id: "provider-a", kind: "metadata" as const },
+      status: "matched" as const,
+      basis: "paper-entity" as const,
+      data: new Entity({
+        ...origin,
+        title: "Updated Title",
+      }),
+      warnings: [],
+    };
+    const mergePriorityLevel = { title: Number.POSITIVE_INFINITY };
+    const context = {
+      providerId: "provider-a",
+      providerIndex: 3,
+      force: false,
+    };
+
+    const merged = (service as any)._applyMetadataMergePolicy(
+      origin,
+      draft,
+      providerResult,
+      mergePriorityLevel,
+      context
+    );
+
+    expect(mergeSpy).toHaveBeenCalledWith(
+      origin,
+      draft,
+      providerResult,
+      mergePriorityLevel,
+      context
+    );
+    expect(merged.paperEntityDraft.title).toBe("Updated Title");
+  });
+});
+
 describe("ScrapeService PaperEntity bypass compatibility", () => {
   it("preserves existing relatedPaperIds when metadata refresh omits relation fields", () => {
     const relatedPaperId = "507f1f77bcf86cd799439099";
