@@ -98,6 +98,27 @@ If relation reads move behind a gateway, add:
 rtk vitest run tests/unit-tests/services/*relation*.spec.ts tests/unit-tests/renderer/*graph*.spec.ts
 ```
 
+## 2026-04-02 verification snapshot (worker-3)
+
+RTK-prefixed regression proof captured on the branch before graph/database work:
+
+- `rtk pnpm run typecheck` — PASS
+- `rtk pnpm exec vitest run tests/unit-tests/services/scrape-stable-metadata-providers.spec.ts tests/unit-tests/services/paper-service-create.spec.ts tests/unit-tests/services/database-service.spec.ts tests/unit-tests/services/file-service.spec.ts tests/unit-tests/services/scrape-service.spec.ts` — PASS (`5` files, `32` tests)
+- `rtk pnpm exec vitest run tests/unit-tests/services/paper-relations.spec.ts tests/unit-tests/renderer/paper-graph.spec.ts tests/unit-tests/renderer/paper-graph-view.spec.ts` — PASS (`3` files, `23` tests)
+
+What this proves right now:
+
+- local-first bootstrap coverage still holds through `paper-service-create`, `database-service`, and `file-service`
+- built-in scrape/provider seams stay regression-safe for the currently landed stable-provider path
+- current graph and relation semantics still match the branch contract before any storage/query-shape changes
+
+## Remaining next steps before the graph/database slice broadens
+
+1. Finish and integrate the remaining stable-provider work for BibTeX, generic HTML metadata, and PDF identifier bootstrap.
+2. Re-run the RTK regression floor above after that provider slice lands on the leader branch.
+3. Only then start the relation-read gateway seam described in this handoff so graph/query acceleration stays isolated from scrape/import churn.
+4. Keep local-managed field preservation and local-library bootstrap behavior under test while relation reads move behind the gateway.
+
 ## Bottom line
 
 The safe next move is not “optimize the graph” in place. It is to introduce a relation-read gateway that preserves current graph semantics, then move graph/detail/batch consumers onto it so storage and query-shape improvements can land without destabilizing the local-first branch.
