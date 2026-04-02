@@ -311,7 +311,7 @@ describe("PaperService relations", () => {
     expect(relatedIdsOf(papers, paperB)).toEqual([paperA]);
   });
 
-  it("delete relies on the repository-owned relation cleanup path", async () => {
+  it("delete delegates relation cleanup to the repository and only verifies repository-owned side effects", async () => {
     const paperA = "507f1f77bcf86cd799439031";
     const paperB = "507f1f77bcf86cd799439032";
     const paperC = "507f1f77bcf86cd799439033";
@@ -324,10 +324,15 @@ describe("PaperService relations", () => {
 
     await service.delete([paperB] as any, undefined, true);
 
+    expect(repository.delete).toHaveBeenCalledWith(
+      expect.anything(),
+      [paperB],
+      undefined
+    );
     expect(Array.from(papers.keys())).toEqual([paperA, paperC]);
     expect(relatedIdsOf(papers, paperA)).toEqual([paperC]);
     expect(relatedIdsOf(papers, paperC)).toEqual([paperA]);
-    expect(repository.delete).toHaveBeenCalled();
+    expect(papers.has(paperB)).toBe(false);
   });
 
   it("preserves relatedPaperIds across update when the incoming draft omits relations", async () => {
