@@ -4,6 +4,26 @@ export enum ProcessingKey {
   General = "general",
 }
 
+function getUIStateService() {
+  return globalThis["PLUIAPI"]?.uiStateService as
+    | {
+        processingState?: unknown;
+        increaseProcessingState: (key: ProcessingKey) => void;
+        decreaseProcessingState: (key: ProcessingKey) => void;
+      }
+    | undefined;
+}
+
+function hasProcessingState(
+  uiStateService: ReturnType<typeof getUIStateService>
+): uiStateService is NonNullable<ReturnType<typeof getUIStateService>> {
+  return (
+    !!uiStateService?.processingState &&
+    typeof uiStateService.increaseProcessingState === "function" &&
+    typeof uiStateService.decreaseProcessingState === "function"
+  );
+}
+
 /**
  * Processing decorator for a method. It will increment the processing count and decrement it when the method is done
  * to trigger something such as a spinner.
@@ -20,19 +40,16 @@ export function processing(key: ProcessingKey) {
 
     if (isAsync) {
       descriptor.value = async function (...args: any[]) {
-        if (
-          globalThis["PLUIAPI"] &&
-          globalThis["PLUIAPI"]["uiStateService"] &&
-          globalThis["PLUIAPI"]["uiStateService"].processingState
-        ) {
-          PLUIAPI.uiStateService.increaseProcessingState(key);
+        const uiStateService = getUIStateService();
+        if (hasProcessingState(uiStateService)) {
+          uiStateService.increaseProcessingState(key);
 
           try {
             const results = await originalMethod.apply(this, args);
-            PLUIAPI.uiStateService.decreaseProcessingState(key);
+            uiStateService.decreaseProcessingState(key);
             return results;
           } catch (error) {
-            PLUIAPI.uiStateService.decreaseProcessingState(key);
+            uiStateService.decreaseProcessingState(key);
             throw error;
           }
         } else {
@@ -41,18 +58,15 @@ export function processing(key: ProcessingKey) {
       };
     } else {
       descriptor.value = function (...args: any[]) {
-        if (
-          globalThis["PLUIAPI"] &&
-          globalThis["PLUIAPI"]["uiStateService"] &&
-          globalThis["PLUIAPI"]["uiStateService"].processingState
-        ) {
-          PLUIAPI.uiStateService.processingState.increaseProcessingState(key);
+        const uiStateService = getUIStateService();
+        if (hasProcessingState(uiStateService)) {
+          uiStateService.increaseProcessingState(key);
           try {
             const results = originalMethod.apply(this, args);
-            PLUIAPI.uiStateService.decreaseProcessingState(key);
+            uiStateService.decreaseProcessingState(key);
             return results;
           } catch (error) {
-            PLUIAPI.uiStateService.decreaseProcessingState(key);
+            uiStateService.decreaseProcessingState(key);
             throw error;
           }
         } else {
