@@ -112,6 +112,20 @@ export const isFolderPathInside = (folderPath: string, maybeParentPath: string) 
   );
 };
 
+export const isCircularFolderMove = (
+  sourceFolderPath: string,
+  targetFolderPath: string
+) => {
+  const normalizedSourcePath = normalizeFolderPath(sourceFolderPath);
+  const normalizedTargetPath = normalizeFolderPath(targetFolderPath);
+
+  if (!normalizedSourcePath || !normalizedTargetPath) {
+    return false;
+  }
+
+  return isFolderPathInside(normalizedTargetPath, normalizedSourcePath);
+};
+
 export const isInternalLibraryPath = (relativePath: string) => {
   const normalized = normalizeFolderPath(relativePath);
   if (!normalized) {

@@ -6,7 +6,7 @@ import { createDecorator } from "@/base/injection/injection";
 import {
   escapeRealmString,
   getParentFolderPath,
-  isFolderPathInside,
+  isCircularFolderMove,
   isValidFolderNameSegment,
   joinFolderPath,
   normalizeFolderPath,
@@ -443,10 +443,12 @@ export class CategorizerService extends Eventable<ICategorizerServiceState> {
       if (
         currentFolderPath &&
         parentFolderPath &&
-        isFolderPathInside(parentFolderPath, currentFolderPath)
+        isCircularFolderMove(currentFolderPath, targetFolderPath)
       ) {
         throw new Error("Circular folder move is not allowed.");
       }
+
+      const shouldSyncFoldersWithLibrary = !targetObject || currentFolderPath !== targetFolderPath;
 
       if (!targetObject) {
         await this._fileService.createFolder(targetFolderPath);
@@ -508,7 +510,9 @@ export class CategorizerService extends Eventable<ICategorizerServiceState> {
         );
       }
 
-      await this.syncFoldersWithLibrary();
+      if (shouldSyncFoldersWithLibrary) {
+        await this.syncFoldersWithLibrary();
+      }
       const syncedFolder = realm
         .objects<PaperFolder>(PaperFolder.schema.name)
         .filtered(`name == "${escapeRealmString(targetFolderPath)}"`)[0];

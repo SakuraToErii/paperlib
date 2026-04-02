@@ -1,4 +1,26 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  afterEach,
+} from "vitest";
+
+vi.mock("fs", async () => {
+  const actual = await vi.importActual<typeof import("fs")>("fs");
+  return {
+    ...actual,
+    existsSync: vi.fn(),
+    promises: {
+      ...actual.promises,
+      mkdir: vi.fn(),
+      readdir: vi.fn(),
+      rename: vi.fn(),
+      rmdir: vi.fn(),
+    },
+  };
+});
 
 vi.mock("../../../app/base/url", () => ({
   constructFileURL: vi.fn((value: string) => `file://${value}`),
@@ -18,21 +40,10 @@ vi.mock("../../../app/base/url", () => ({
   listAllFiles: vi.fn(async () => []),
 }));
 
-vi.mock("../../../app/base/folder", () => ({
-  getFolderPathFromRelativeFile: vi.fn((value: string) =>
-    value.split("/").slice(0, -1).join("/")
-  ),
-  getParentFolderPath: vi.fn(),
-  isInternalLibraryPath: vi.fn(() => false),
-  joinFolderPath: vi.fn((...segments: string[]) =>
-    segments.filter(Boolean).join("/").replace(/\/+/g, "/")
-  ),
-  normalizeFolderPath: vi.fn((value: string) => value.replace(/^\/+|\/+$/g, "")),
-}));
-
 describe("FileService.move", () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.clearAllMocks();
     globalThis.PLMainAPI = {
       preferenceService: {
         get: vi.fn(async (key: string) => {
@@ -43,6 +54,10 @@ describe("FileService.move", () => {
         }),
       },
     };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("imports external files into the library folder and updates the stored URL", async () => {
@@ -116,5 +131,133 @@ describe("FileService.move", () => {
     expect(paperEntity.supplementaries.main.url).toBe(
       "file://Library/Renamed Title_main.pdf"
     );
+  });
+});
+
+describe("FileService folder mutation helpers", () => {
+  it("normalizes folder creation and renames while creating the target parent once", async () => {
+    const { promises: fsPromise } = await import("fs");
+    const { FileService } = await import("../../../app/service/services/file-service");
+    const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any);
+
+    vi.spyOn(service, "libraryFolder").mockResolvedValue("/library");
+
+    await service.createFolder(" Research\\ML / Agents ");
+    expect(fsPromise.mkdir).toHaveBeenCalledWith("/library/Research/ML/Agents", {
+      recursive: true,
+    });
+
+    const createFolderSpy = vi.spyOn(service, "createFolder").mockResolvedValue();
+    await service.renameFolder(" Research\\ML ", " Archive / ML Renamed ");
+
+    expect(createFolderSpy).toHaveBeenCalledWith("Archive");
+    expect(fsPromise.rename).toHaveBeenCalledWith(
+      "/library/Research/ML",
+      "/library/Archive/ML Renamed"
+    );
+  });
+
+  it("rejects renaming a folder into one of its descendants", async () => {
+    const { FileService } = await import("../../../app/service/services/file-service");
+    const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any);
+
+    vi.spyOn(service, "libraryFolder").mockResolvedValue("/library");
+
+    await expect(
+      service.renameFolder("Research/ML", "Research/ML/Agents")
+    ).rejects.toThrow("Circular folder move is not allowed.");
+  });
+
+  it("prunes only empty parents when deleting empty folders", async () => {
+    const { promises: fsPromise } = await import("fs");
+    const { FileService } = await import("../../../app/service/services/file-service");
+    const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any);
+
+    vi.spyOn(service, "libraryFolder").mockResolvedValue("/library");
+    vi.mocked(fsPromise.readdir)
+      .mockResolvedValueOnce([] as any)
+      .mockResolvedValueOnce([] as any)
+      .mockResolvedValueOnce(["keep.txt"] as any);
+
+    await service.deleteEmptyFolder("Research/ML/Agents", true);
+
+    expect(fsPromise.rmdir).toHaveBeenNthCalledWith(
+      1,
+      "/library/Research/ML/Agents"
+    );
+    expect(fsPromise.rmdir).toHaveBeenNthCalledWith(2, "/library/Research/ML");
+    expect(fsPromise.rmdir).toHaveBeenCalledTimes(2);
+  });
+
+  it("rewrites only managed descendant file URLs during folder remaps", async () => {
+    const { FileService } = await import("../../../app/service/services/file-service");
+    const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any);
+
+    expect(
+      service.remapManagedFileURL(
+        "file://Research/ML/paper.pdf",
+        " Research ",
+        " Archive ",
+        "/library"
+      )
+    ).toBe("file://Archive/ML/paper.pdf");
+
+    expect(
+      service.remapManagedFileURL(
+        "file://ResearchX/paper.pdf",
+        "Research",
+        "Archive",
+        "/library"
+      )
+    ).toBe("file://ResearchX/paper.pdf");
+
+    expect(
+      service.remapManagedFileURL(
+        "https://example.com/paper.pdf",
+        "Research",
+        "Archive",
+        "/library"
+      )
+    ).toBe("https://example.com/paper.pdf");
+  });
+
+  it("detects only managed local file URLs inside the library root", async () => {
+    const { existsSync } = await import("fs");
+    const { FileService } = await import("../../../app/service/services/file-service");
+    const service = new FileService({ hasHook: vi.fn(() => false) } as any, {
+      warn: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    } as any);
+
+    expect(service.getManagedRelativePath("file://Research/ML/paper.pdf", "/library")).toBe(
+      "Research/ML/paper.pdf"
+    );
+    expect(
+      service.getManagedRelativePath(
+        "file:///library/Research/ML/paper.pdf",
+        "/library"
+      )
+    ).toBe("Research/ML/paper.pdf");
+    expect(service.getManagedRelativePath("file:///outside/paper.pdf", "/library")).toBe("");
+    expect(service.getManagedRelativePath("file://../escape.pdf", "/library")).toBe("");
+
+    vi.mocked(existsSync).mockReturnValue(true);
   });
 });

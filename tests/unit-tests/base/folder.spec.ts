@@ -4,6 +4,7 @@ import {
   escapeRealmString,
   getFolderPathFromRelativeFile,
   getFolderPrefixQuery,
+  isCircularFolderMove,
   isFolderPathInside,
   isInternalLibraryPath,
   joinFolderPath,
@@ -56,6 +57,13 @@ describe("folder compatibility helpers", () => {
     expect(isFolderPathInside("Research/ML/Agents", "Research/ML")).toBe(true);
     expect(isFolderPathInside("Research/MLX", "Research/ML")).toBe(false);
     expect(isFolderPathInside("Research", "Research/ML")).toBe(false);
+  });
+
+  it("detects circular folder moves only for same-folder or descendant targets", () => {
+    expect(isCircularFolderMove("Research/ML", "Research/ML")).toBe(true);
+    expect(isCircularFolderMove("Research/ML", "Research/ML/Agents")).toBe(true);
+    expect(isCircularFolderMove("Research/ML", "Research/Archive")).toBe(false);
+    expect(isCircularFolderMove("Research/ML", "Archive/ML")).toBe(false);
   });
 
   it("derives folder paths from relative file paths after normalization", () => {

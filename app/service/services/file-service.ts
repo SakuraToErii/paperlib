@@ -18,6 +18,7 @@ import {
 import {
   getFolderPathFromRelativeFile,
   getParentFolderPath,
+  isCircularFolderMove,
   isInternalLibraryPath,
   joinFolderPath,
   normalizeFolderPath,
@@ -189,6 +190,10 @@ export class FileService extends Eventable<IFileServiceState> {
       return;
     }
 
+    if (isCircularFolderMove(normalizedSource, normalizedTarget)) {
+      throw new Error("Circular folder move is not allowed.");
+    }
+
     await this.createFolder(getParentFolderPath(normalizedTarget));
     await fsPromise.rename(
       path.join(await this.libraryFolder(), normalizedSource),
@@ -282,10 +287,23 @@ export class FileService extends Eventable<IFileServiceState> {
       return "";
     }
 
-    const relativePath = path.isAbsolute(rawPath)
-      ? getRelativePath(rawPath, libraryFolder)
+    const normalizedLibraryFolder = path.resolve(libraryFolder);
+    const normalizedRelativePath = path.isAbsolute(rawPath)
+      ? (() => {
+          const resolvedRawPath = path.resolve(rawPath);
+          const relativePath = getRelativePath(resolvedRawPath, normalizedLibraryFolder);
+          const normalizedRelativePath = normalizeFolderPath(relativePath);
+
+          if (
+            resolvedRawPath !== normalizedLibraryFolder &&
+            !resolvedRawPath.startsWith(`${normalizedLibraryFolder}${path.sep}`)
+          ) {
+            return "";
+          }
+
+          return normalizedRelativePath;
+        })()
       : normalizeFolderPath(rawPath);
-    const normalizedRelativePath = normalizeFolderPath(relativePath);
 
     if (
       !normalizedRelativePath ||
