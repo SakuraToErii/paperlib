@@ -89,13 +89,6 @@ onMounted(async () => {
             <BIconGlobe class="my-auto text-xs" />
           </SectionItem>
           <SectionItem
-            :name="$t('preference.cloud')"
-            :active="preferenceTab === 'cloud'"
-            @click="preferenceTab = 'cloud'"
-          >
-            <BIconCloudArrowUp class="my-auto text-xs" />
-          </SectionItem>
-          <SectionItem
             :name="$t('preference.import')"
             :active="preferenceTab === 'import'"
             @click="preferenceTab = 'import'"
@@ -122,6 +115,13 @@ onMounted(async () => {
             @click="preferenceTab = 'extension'"
           >
             <BIconPuzzle class="my-auto text-xs" />
+          </SectionItem>
+          <SectionItem
+            :name="$t('preference.cloud')"
+            :active="preferenceTab === 'cloud'"
+            @click="preferenceTab = 'cloud'"
+          >
+            <BIconCloudArrowUp class="my-auto text-xs" />
           </SectionItem>
           <SectionItem
             :name="$t('preference.about')"
