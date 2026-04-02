@@ -92,6 +92,16 @@ function createHarness(initialPapers: InMemoryPaper[]) {
           )
         );
 
+        for (const [id, paper] of papers.entries()) {
+          if (targetIds.has(id)) {
+            continue;
+          }
+
+          paper.relatedPaperIds = paper.relatedPaperIds.filter(
+            (relatedId) => !targetIds.has(`${relatedId}`)
+          );
+        }
+
         for (const id of targetIds) {
           papers.delete(id);
         }
@@ -301,7 +311,7 @@ describe("PaperService relations", () => {
     expect(relatedIdsOf(papers, paperB)).toEqual([paperA]);
   });
 
-  it("delete delegates relation cleanup to the repository-side owner", async () => {
+  it("delete relies on the repository-owned relation cleanup path", async () => {
     const paperA = "507f1f77bcf86cd799439031";
     const paperB = "507f1f77bcf86cd799439032";
     const paperC = "507f1f77bcf86cd799439033";
@@ -315,8 +325,8 @@ describe("PaperService relations", () => {
     await service.delete([paperB] as any, undefined, true);
 
     expect(Array.from(papers.keys())).toEqual([paperA, paperC]);
-    expect(relatedIdsOf(papers, paperA)).toEqual([paperB, paperC]);
-    expect(relatedIdsOf(papers, paperC)).toEqual([paperA, paperB]);
+    expect(relatedIdsOf(papers, paperA)).toEqual([paperC]);
+    expect(relatedIdsOf(papers, paperC)).toEqual([paperA]);
     expect(repository.delete).toHaveBeenCalled();
   });
 
