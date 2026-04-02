@@ -50,6 +50,85 @@ export const IPaperService = createDecorator("paperService");
  * Service for paper entity operations.
  */
 export class PaperService extends Eventable<IPaperServiceState> {
+  private _normalizeImportedFileURL(url: string) {
+    if (!url) {
+      return "";
+    }
+
+    if (getProtocol(url) === "file") {
+      return decodeURIComponent(new URL(url).pathname);
+    }
+
+    return url;
+  }
+
+  private _createImportedFileFallbackDraft(url: string) {
+    const filePath = this._normalizeImportedFileURL(url);
+    const fallbackTitle =
+      path.basename(filePath, path.extname(filePath)) || "Imported paper";
+    const paperEntityDraft = new Entity({
+      title: fallbackTitle,
+    });
+    const supId = uid();
+    paperEntityDraft.supplementaries = {
+      [supId]: new Supplementary({
+        _id: supId,
+        url,
+      }),
+    };
+    paperEntityDraft.defaultSup = supId;
+
+    return paperEntityDraft;
+  }
+
+  private _getImportedFileDraftSourceURL(paperEntityDraft?: Entity) {
+    if (!paperEntityDraft) {
+      return "";
+    }
+
+    const defaultFileURL = getDefaultSupplementaryFileURL(paperEntityDraft);
+    if (defaultFileURL) {
+      return this._normalizeImportedFileURL(defaultFileURL);
+    }
+
+    const fileSupplementary = Object.values(
+      paperEntityDraft.supplementaries || {}
+    ).find((supplementary) => getProtocol(supplementary.url) === "file");
+
+    return fileSupplementary
+      ? this._normalizeImportedFileURL(fileSupplementary.url)
+      : "";
+  }
+
+  private _mergeImportedFileDraftFallback(
+    scrapedPaperEntityDraft: Entity | undefined,
+    fallbackPaperEntityDraft: Entity
+  ) {
+    if (!scrapedPaperEntityDraft) {
+      return fallbackPaperEntityDraft;
+    }
+
+    const mergedPaperEntityDraft = new Entity(scrapedPaperEntityDraft);
+    if (Object.keys(mergedPaperEntityDraft.supplementaries || {}).length === 0) {
+      mergedPaperEntityDraft.supplementaries =
+        fallbackPaperEntityDraft.supplementaries;
+    }
+    if (!mergedPaperEntityDraft.defaultSup) {
+      mergedPaperEntityDraft.defaultSup = fallbackPaperEntityDraft.defaultSup;
+    }
+
+    const normalizedTitle = mergedPaperEntityDraft.title.trim().toLowerCase();
+    if (
+      !normalizedTitle ||
+      normalizedTitle === "undefined" ||
+      normalizedTitle === "untitled"
+    ) {
+      mergedPaperEntityDraft.title = fallbackPaperEntityDraft.title;
+    }
+
+    return mergedPaperEntityDraft;
+  }
+
   private _syncPaperRelationIds(
     paper: Entity,
     nextRelatedIds: Iterable<string>
@@ -530,38 +609,48 @@ export class PaperService extends Eventable<IPaperServiceState> {
     const payloads = urlList.map((url) => {
       return { type: "file", value: url };
     });
-    // FIXME: fix this bypass for debug
-    // const scrapedPaperEntityDrafts = await this._scrapeService.scrape(
-    //   payloads,
-    //   [],
-    //   false
-    // );
+    const fallbackPaperEntityDrafts = urlList.map((url) =>
+      this._createImportedFileFallbackDraft(url)
+    );
+    const scrapedPaperEntityDrafts = await this._scrapeService.scrape(
+      payloads,
+      [],
+      false
+    );
+    const pendingFallbackDrafts = new Map(
+      fallbackPaperEntityDrafts.map((draft, index) => [
+        this._normalizeImportedFileURL(urlList[index]),
+        draft,
+      ])
+    );
+    const hydratedPaperEntityDrafts = scrapedPaperEntityDrafts.map(
+      (scrapedPaperEntityDraft, index) => {
+        const sourceURL =
+          this._getImportedFileDraftSourceURL(scrapedPaperEntityDraft) ||
+          this._normalizeImportedFileURL(urlList[index] || "");
+        const fallbackPaperEntityDraft = pendingFallbackDrafts.get(sourceURL);
+        if (!fallbackPaperEntityDraft) {
+          return new Entity(scrapedPaperEntityDraft);
+        }
 
-    const scrapedPaperEntityDrafts = urlList.map((url) => {
-      const filePath = url.startsWith("file://")
-        ? decodeURIComponent(new URL(url).pathname)
-        : url;
-      const fallbackTitle =
-        path.basename(filePath, path.extname(filePath)) || "Imported paper";
-      const paperEntityDraft = new Entity({
-        title: fallbackTitle,
-        year: "2025",
-        booktitle: "Test booktitle",
-        type: "inproceedings",
-      });
-      const supId = uid();
-      paperEntityDraft.supplementaries = {
-        [supId]: new Supplementary({
-          _id: supId,
-          url: url,
-        }),
-      };
-      paperEntityDraft.defaultSup = supId;
-      return paperEntityDraft;
-    });
+        pendingFallbackDrafts.delete(sourceURL);
+        return this._mergeImportedFileDraftFallback(
+          scrapedPaperEntityDraft,
+          fallbackPaperEntityDraft
+        );
+      }
+    );
+    const mergedPaperEntityDrafts = [
+      ...hydratedPaperEntityDrafts,
+      ...urlList
+        .map((url) =>
+          pendingFallbackDrafts.get(this._normalizeImportedFileURL(url))
+        )
+        .filter((draft): draft is Entity => !!draft),
+    ];
 
     // 2. Update.
-    return await this.update(scrapedPaperEntityDrafts, true, false);
+    return await this.update(mergedPaperEntityDrafts, true, false);
   }
 
   /**
