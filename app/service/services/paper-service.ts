@@ -4,7 +4,6 @@ import { chunkRun } from "@/base/chunk";
 import { errorcatching } from "@/base/error";
 import { Eventable } from "@/base/event";
 import { PaperFilterOptions } from "@/base/filter";
-import { normalizeFolderPath } from "@/base/folder";
 import { createDecorator } from "@/base/injection/injection";
 import { ILogService, LogService } from "@/common/services/log-service";
 import { ProcessingKey, processing } from "@/common/utils/processing";
@@ -29,7 +28,14 @@ import {
 import { CacheService, ICacheService } from "./cache-service";
 import { CategorizerService, ICategorizerService } from "./categorizer-service";
 import { FileService, IFileService } from "./file-service";
-import { normalizeRelationIds, toObjectIds, assignRepairedRelations, preserveMissingRelationIds, removeRelationIds, normalizeEntityFolderPath } from "./paper-relation-integrity";
+import {
+  assignRepairedRelations,
+  normalizeEntityFolderPath,
+  normalizeRelationIds,
+  preserveMissingRelationIds,
+  removeRelationIds,
+  toObjectIds,
+} from "./paper-relation-integrity";
 import { ISchedulerService, SchedulerService } from "./scheduler-service";
 import { IScrapeService, ScrapeService } from "./scrape-service";
 
@@ -109,7 +115,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
     }
 
     const mergedPaperEntityDraft = new Entity(scrapedPaperEntityDraft);
-    if (Object.keys(mergedPaperEntityDraft.supplementaries || {}).length === 0) {
+    if (
+      Object.keys(mergedPaperEntityDraft.supplementaries || {}).length === 0
+    ) {
       mergedPaperEntityDraft.supplementaries =
         fallbackPaperEntityDraft.supplementaries;
     }

@@ -43,8 +43,8 @@ vi.mock("../../../app/base/misc", () => ({
   uid: vi.fn(() => "sup-1"),
 }));
 
-import { PaperService } from "../../../app/service/services/paper-service";
 import { uid } from "../../../app/base/misc";
+import { PaperService } from "../../../app/service/services/paper-service";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -95,17 +95,28 @@ describe("PaperService file import placeholder titles", () => {
       },
     ]);
 
-    const updateSpy = vi.spyOn(service, "update").mockImplementation(mockUpdate as any);
+    const updateSpy = vi
+      .spyOn(service, "update")
+      .mockImplementation(mockUpdate as any);
 
-    const [draft] = await service.create(["/Users/testuser/Papers/Deep Learning Survey.pdf"]);
+    const [draft] = await service.create([
+      "/Users/testuser/Papers/Deep Learning Survey.pdf",
+    ]);
 
     expect(mockScrape).toHaveBeenCalledWith(
-      [{ type: "file", value: "/Users/testuser/Papers/Deep Learning Survey.pdf" }],
+      [
+        {
+          type: "file",
+          value: "/Users/testuser/Papers/Deep Learning Survey.pdf",
+        },
+      ],
       [],
       false
     );
     expect(draft.title).toBe("Scraped Deep Learning Survey");
-    expect(draft.supplementaries["sup-1"].url).toBe("/Users/testuser/Papers/Deep Learning Survey.pdf");
+    expect(draft.supplementaries["sup-1"].url).toBe(
+      "/Users/testuser/Papers/Deep Learning Survey.pdf"
+    );
     expect(draft.defaultSup).toBe("sup-1");
 
     updateSpy.mockRestore();
@@ -115,12 +126,18 @@ describe("PaperService file import placeholder titles", () => {
     const service = createService();
     mockScrape.mockResolvedValue([]);
 
-    const updateSpy = vi.spyOn(service, "update").mockImplementation(mockUpdate as any);
+    const updateSpy = vi
+      .spyOn(service, "update")
+      .mockImplementation(mockUpdate as any);
 
-    const [draft] = await service.create(["file:///Users/testuser/Papers/Graph%20Nets.pdf"]);
+    const [draft] = await service.create([
+      "file:///Users/testuser/Papers/Graph%20Nets.pdf",
+    ]);
 
     expect(draft.title).toBe("Graph Nets");
-    expect(draft.supplementaries["sup-1"].url).toBe("file:///Users/testuser/Papers/Graph%20Nets.pdf");
+    expect(draft.supplementaries["sup-1"].url).toBe(
+      "file:///Users/testuser/Papers/Graph%20Nets.pdf"
+    );
 
     updateSpy.mockRestore();
   });
@@ -134,12 +151,18 @@ describe("PaperService file import placeholder titles", () => {
       },
     ]);
 
-    const updateSpy = vi.spyOn(service, "update").mockImplementation(mockUpdate as any);
+    const updateSpy = vi
+      .spyOn(service, "update")
+      .mockImplementation(mockUpdate as any);
 
-    const [draft] = await service.create(["/Users/testuser/Papers/Untitled Draft.pdf"]);
+    const [draft] = await service.create([
+      "/Users/testuser/Papers/Untitled Draft.pdf",
+    ]);
 
     expect(draft.title).toBe("Untitled Draft");
-    expect(draft.supplementaries["sup-1"].url).toBe("/Users/testuser/Papers/Untitled Draft.pdf");
+    expect(draft.supplementaries["sup-1"].url).toBe(
+      "/Users/testuser/Papers/Untitled Draft.pdf"
+    );
 
     updateSpy.mockRestore();
   });
