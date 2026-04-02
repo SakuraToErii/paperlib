@@ -1,3 +1,4 @@
+import { normalizeFolderPath } from "@/base/folder";
 import { ObjectId } from "bson";
 
 import { OID } from "@/models/id";
@@ -68,4 +69,38 @@ export const repairRelationGraph = <
     paper,
     relatedIds: Array.from(adjacencyMap.get(`${paper._id}`) || []),
   }));
+};
+
+export const assignRepairedRelations = <
+  TPaper extends { _id: OID | string; relatedPaperIds?: OID[] | string[] }
+>(
+  papers: Iterable<TPaper>,
+  assign: (paper: TPaper, relatedIds: string[]) => void
+) => {
+  for (const { paper, relatedIds } of repairRelationGraph(papers)) {
+    assign(paper, relatedIds);
+  }
+};
+
+export const removeRelationIds = (
+  relatedIds: Iterable<OID | string> | undefined,
+  removedIds: Iterable<OID | string>
+) => {
+  const removedIdSet = new Set(normalizeRelationIds(removedIds));
+
+  return normalizeRelationIds(relatedIds).filter((id) => !removedIdSet.has(id));
+};
+
+export const normalizeEntityFolderPath = (paper: {
+  folders?: Array<{ name?: string }>;
+}) => {
+  const folderPaths = (paper.folders || [])
+    .map((folder) => normalizeFolderPath(folder.name))
+    .filter((folderPath) => folderPath);
+
+  if (folderPaths.length === 0) {
+    return "";
+  }
+
+  return folderPaths.sort((left, right) => right.length - left.length)[0];
 };

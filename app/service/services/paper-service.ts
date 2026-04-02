@@ -29,7 +29,7 @@ import {
 import { CacheService, ICacheService } from "./cache-service";
 import { CategorizerService, ICategorizerService } from "./categorizer-service";
 import { FileService, IFileService } from "./file-service";
-import { normalizeRelationIds, toObjectIds } from "./paper-relation-integrity";
+import { normalizeRelationIds, toObjectIds, assignRepairedRelations, removeRelationIds, normalizeEntityFolderPath } from "./paper-relation-integrity";
 import { ISchedulerService, SchedulerService } from "./scheduler-service";
 import { IScrapeService, ScrapeService } from "./scrape-service";
 
@@ -39,15 +39,9 @@ export interface IPaperServiceState {
 }
 
 const entityHasFolderSemanticChanges = (paperEntity: IEntityObject) => {
-  const assignedFolderPaths = (paperEntity.folders || [])
-    .map((folder) => normalizeFolderPath(folder.name))
-    .filter((folderPath) => folderPath);
+  const assignedFolderPath = normalizeEntityFolderPath(paperEntity);
 
-  if (assignedFolderPaths.length > 1) {
-    return true;
-  }
-
-  return assignedFolderPaths.some((folderPath) => folderPath.includes("/"));
+  return Boolean(assignedFolderPath.includes("/"));
 };
 
 export const IPaperService = createDecorator("paperService");
@@ -66,34 +60,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
   }
 
   private _repairPapersRelationIntegrity(papers: Entity[]) {
-    const paperMap = new Map<string, Entity>();
-
-    for (const paper of papers) {
-      paperMap.set(`${paper._id}`, paper);
-    }
-
-    for (const paper of paperMap.values()) {
-      const paperId = `${paper._id}`;
-      const nextIds = normalizeRelationIds(
-        paper.relatedPaperIds as any,
-        paperId
-      ).filter((relatedId) => paperMap.has(relatedId));
-
-      for (const relatedId of nextIds) {
-        const relatedPaper = paperMap.get(relatedId);
-        if (!relatedPaper) {
-          continue;
-        }
-
-        const reverseIds = new Set(
-          normalizeRelationIds(relatedPaper.relatedPaperIds as any, relatedId)
-        );
-        reverseIds.add(paperId);
-        this._syncPaperRelationIds(relatedPaper, reverseIds);
-      }
-
-      this._syncPaperRelationIds(paper, nextIds);
-    }
+    assignRepairedRelations(papers, (paper, relatedIds) => {
+      this._syncPaperRelationIds(paper, relatedIds);
+    });
   }
 
   constructor(
@@ -494,17 +463,16 @@ export class PaperService extends Eventable<IPaperServiceState> {
             continue;
           }
 
-          const relatedPaperIds = (paperEntity.relatedPaperIds || []).filter(
-            (relatedId) => !targetPaperIdSet.has(`${relatedId}`)
+          const relatedPaperIds = removeRelationIds(
+            paperEntity.relatedPaperIds as any,
+            targetPaperIdSet
           );
 
           if (
             relatedPaperIds.length !==
-            (paperEntity.relatedPaperIds || []).length
+            normalizeRelationIds(paperEntity.relatedPaperIds as any).length
           ) {
-            paperEntity.relatedPaperIds = relatedPaperIds.map(
-              (relatedId) => new ObjectId(`${relatedId}`)
-            ) as any;
+            this._syncPaperRelationIds(paperEntity, relatedPaperIds);
           }
         }
       });
@@ -663,7 +631,7 @@ export class PaperService extends Eventable<IPaperServiceState> {
   ) {
     const normalizedPaperId = `${paperId}`;
     if (!ObjectId.isValid(normalizedPaperId)) {
-      throw new Error(`Invalid paper id: ${paperId}`);
+      return;
     }
 
     const requestedRelatedIds = normalizeRelationIds(
@@ -692,6 +660,9 @@ export class PaperService extends Eventable<IPaperServiceState> {
       const directlyRelatedPapers = Array.from(
         this._paperEntityRepository.loadByIds(realm, requestedRelatedIds)
       ) as Entity[];
+      const directlyRelatedIds = directlyRelatedPapers.map(
+        (paper) => `${paper._id}`
+      );
       const previouslyRelatedIds = normalizeRelationIds(
         targetPaper.relatedPaperIds as any,
         normalizedPaperId
@@ -704,11 +675,24 @@ export class PaperService extends Eventable<IPaperServiceState> {
         targetPaper,
         directlyRelatedPapers.map((paper) => `${paper._id}`)
       );
-      this._repairPapersRelationIntegrity([
-        targetPaper,
-        ...directlyRelatedPapers,
-        ...previouslyRelatedPapers,
-      ]);
+      this._syncPaperRelationIds(targetPaper, directlyRelatedIds);
+
+      for (const paper of directlyRelatedPapers) {
+        const reverseIds = new Set(
+          normalizeRelationIds(paper.relatedPaperIds as any, `${paper._id}`)
+        );
+        reverseIds.add(normalizedPaperId);
+        this._syncPaperRelationIds(paper, reverseIds);
+      }
+
+      for (const paper of previouslyRelatedPapers) {
+        if (!directlyRelatedIds.includes(`${paper._id}`)) {
+          this._syncPaperRelationIds(
+            paper,
+            removeRelationIds(paper.relatedPaperIds as any, [normalizedPaperId])
+          );
+        }
+      }
     });
   }
 
@@ -754,8 +738,6 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
         this._syncPaperRelationIds(paper, nextIds);
       }
-
-      this._repairPapersRelationIntegrity(targetPapers);
     });
   }
 
@@ -798,8 +780,6 @@ export class PaperService extends Eventable<IPaperServiceState> {
 
         this._syncPaperRelationIds(paper, nextIds);
       }
-
-      this._repairPapersRelationIntegrity(targetPapers);
     });
   }
 

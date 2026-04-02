@@ -13,11 +13,17 @@ vi.mock("../../../app/models/entity", async () => {
     relatedPaperIds: InstanceType<typeof ObjectId>[];
 
     constructor(object: any = {}, initObjectId = false) {
-      this._id = object?._id ? new ObjectId(object._id) : initObjectId ? new ObjectId() : ("" as any);
+      this._id = object?._id
+        ? new ObjectId(object._id)
+        : initObjectId
+        ? new ObjectId()
+        : ("" as any);
       this.title = object?.title || "";
       this.authors = object?.authors || "";
       this.year = object?.year || "";
-      this.relatedPaperIds = (object?.relatedPaperIds || []).map((id: any) => new ObjectId(id));
+      this.relatedPaperIds = (object?.relatedPaperIds || []).map(
+        (id: any) => new ObjectId(id)
+      );
     }
   }
 
@@ -27,22 +33,35 @@ vi.mock("../../../app/models/entity", async () => {
 import { ObjectId } from "bson";
 import { Entity } from "../../../app/models/entity";
 import { PaperService } from "../../../app/service/services/paper-service";
+import {
+  normalizeEntityFolderPath,
+  normalizeRelationIds,
+  removeRelationIds,
+  repairRelationGraph,
+} from "../../../app/service/services/paper-relation-integrity";
 
 declare global {
-  // eslint-disable-next-line no-var
   var PLAPILocal: any;
 }
 
 type InMemoryPaper = Entity & { relatedPaperIds: ObjectId[] };
 
-function createPaper(id: string, relatedPaperIds: string[] = []): InMemoryPaper {
-  return new Entity({
-    _id: new ObjectId(id),
-    title: `Paper ${id.slice(-4)}`,
-    authors: "Test Author",
-    year: "2024",
-    relatedPaperIds: relatedPaperIds.map((relatedId) => new ObjectId(relatedId)),
-  }, false) as InMemoryPaper;
+function createPaper(
+  id: string,
+  relatedPaperIds: string[] = []
+): InMemoryPaper {
+  return new Entity(
+    {
+      _id: new ObjectId(id),
+      title: `Paper ${id.slice(-4)}`,
+      authors: "Test Author",
+      year: "2024",
+      relatedPaperIds: relatedPaperIds.map(
+        (relatedId) => new ObjectId(relatedId)
+      ),
+    },
+    false
+  ) as InMemoryPaper;
 }
 
 function createHarness(initialPapers: InMemoryPaper[]) {
@@ -60,17 +79,25 @@ function createHarness(initialPapers: InMemoryPaper[]) {
         .map((id) => papers.get(`${id}`))
         .filter((paper): paper is InMemoryPaper => Boolean(paper))
     ),
-    delete: vi.fn((_realm: unknown, ids?: Array<string | ObjectId>, paperEntities?: Entity[]) => {
-      const targetIds = new Set(
-        (ids || paperEntities?.map((entity) => entity._id) || []).map((id) => `${id}`)
-      );
+    delete: vi.fn(
+      (
+        _realm: unknown,
+        ids?: Array<string | ObjectId>,
+        paperEntities?: Entity[]
+      ) => {
+        const targetIds = new Set(
+          (ids || paperEntities?.map((entity) => entity._id) || []).map(
+            (id) => `${id}`
+          )
+        );
 
-      for (const id of targetIds) {
-        papers.delete(id);
+        for (const id of targetIds) {
+          papers.delete(id);
+        }
+
+        return [];
       }
-
-      return [];
-    }),
+    ),
   };
 
   const databaseCore = {
@@ -119,8 +146,55 @@ function createHarness(initialPapers: InMemoryPaper[]) {
 }
 
 function relatedIdsOf(papers: Map<string, InMemoryPaper>, id: string) {
-  return (papers.get(id)?.relatedPaperIds || []).map((relatedId) => `${relatedId}`);
+  return (papers.get(id)?.relatedPaperIds || []).map(
+    (relatedId) => `${relatedId}`
+  );
 }
+
+describe("paper relation integrity helpers", () => {
+  it("repairs graphs symmetrically while dropping self, duplicates, invalid, and missing ids", () => {
+    const paperA = "507f1f77bcf86cd7994390a1";
+    const paperB = "507f1f77bcf86cd7994390a2";
+    const paperC = "507f1f77bcf86cd7994390a3";
+
+    const repaired = repairRelationGraph([
+      { _id: paperA, relatedPaperIds: [paperB, paperB, paperA, "bad-id"] as any },
+      { _id: paperB, relatedPaperIds: [] },
+      { _id: paperC, relatedPaperIds: [paperB] },
+    ]);
+
+    expect(
+      Object.fromEntries(
+        repaired.map(({ paper, relatedIds }) => [`${paper._id}`, relatedIds])
+      )
+    ).toEqual({
+      [paperA]: [paperB],
+      [paperB]: [paperA, paperC],
+      [paperC]: [paperB],
+    });
+  });
+
+  it("removes deleted ids through the shared normalization path", () => {
+    const paperA = "507f1f77bcf86cd7994390b1";
+    const paperB = "507f1f77bcf86cd7994390b2";
+
+    expect(
+      removeRelationIds([paperA, paperA, paperB, "bad-id"] as any, [paperA])
+    ).toEqual([paperB]);
+    expect(normalizeRelationIds([paperA, paperA, "bad-id"] as any)).toEqual([
+      paperA,
+    ]);
+  });
+
+  it("chooses the deepest normalized folder path as the canonical folder", () => {
+    expect(
+      normalizeEntityFolderPath({
+        folders: [{ name: " Research " }, { name: "Research/ML " }],
+      })
+    ).toBe("Research/ML");
+    expect(normalizeEntityFolderPath({ folders: [{ name: "  " }] })).toBe("");
+  });
+});
 
 describe("PaperService relations", () => {
   beforeEach(() => {
@@ -143,7 +217,12 @@ describe("PaperService relations", () => {
       createPaper(paperC),
     ]);
 
-    await service.setRelatedPaperIds(paperA, [paperB, paperB, paperA, paperC] as any);
+    await service.setRelatedPaperIds(paperA, [
+      paperB,
+      paperB,
+      paperA,
+      paperC,
+    ] as any);
 
     expect(relatedIdsOf(papers, paperA)).toEqual([paperB, paperC]);
     expect(relatedIdsOf(papers, paperB)).toEqual([paperA]);
