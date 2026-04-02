@@ -29,7 +29,7 @@ import {
 import { CacheService, ICacheService } from "./cache-service";
 import { CategorizerService, ICategorizerService } from "./categorizer-service";
 import { FileService, IFileService } from "./file-service";
-import { normalizeRelationIds, toObjectIds, assignRepairedRelations, removeRelationIds, normalizeEntityFolderPath } from "./paper-relation-integrity";
+import { normalizeRelationIds, toObjectIds, assignRepairedRelations, preserveMissingRelationIds, removeRelationIds, normalizeEntityFolderPath } from "./paper-relation-integrity";
 import { ISchedulerService, SchedulerService } from "./scheduler-service";
 import { IScrapeService, ScrapeService } from "./scrape-service";
 
@@ -241,6 +241,17 @@ export class PaperService extends Eventable<IPaperServiceState> {
     const updatedPaperEntityDrafts: (Entity | null)[] = [];
 
     for (const paperEntity of fileMovedPaperEntityDrafts) {
+      const existingPaperEntity = isUpdate
+        ? this._paperEntityRepository.toRealmObject(realm, paperEntity)
+        : undefined;
+
+      if (existingPaperEntity) {
+        paperEntity.relatedPaperIds = preserveMissingRelationIds(
+          existingPaperEntity,
+          paperEntity
+        ) as any;
+      }
+
       let success: boolean;
       try {
         success = this._paperEntityRepository.update(
@@ -443,38 +454,6 @@ export class PaperService extends Eventable<IPaperServiceState> {
       await PLAPILocal.syncService.addSyncLog("paper", "delete", {
         ids,
         paperEntities: targetPaperEntities,
-      });
-    }
-
-    if (targetPaperIds && targetPaperIds.length > 0) {
-      realm.safeWrite(() => {
-        const targetPaperIdSet = new Set(targetPaperIds);
-        const allPaperEntities = Array.from(
-          this._paperEntityRepository.load(
-            realm,
-            "",
-            "title",
-            "desc"
-          ) as Iterable<Entity>
-        );
-
-        for (const paperEntity of allPaperEntities) {
-          if (targetPaperIdSet.has(`${paperEntity._id}`)) {
-            continue;
-          }
-
-          const relatedPaperIds = removeRelationIds(
-            paperEntity.relatedPaperIds as any,
-            targetPaperIdSet
-          );
-
-          if (
-            relatedPaperIds.length !==
-            normalizeRelationIds(paperEntity.relatedPaperIds as any).length
-          ) {
-            this._syncPaperRelationIds(paperEntity, relatedPaperIds);
-          }
-        }
       });
     }
 

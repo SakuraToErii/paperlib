@@ -36,6 +36,7 @@ import { PaperService } from "../../../app/service/services/paper-service";
 import {
   normalizeEntityFolderPath,
   normalizeRelationIds,
+  preserveMissingRelationIds,
   removeRelationIds,
   repairRelationGraph,
 } from "../../../app/service/services/paper-relation-integrity";
@@ -152,6 +153,23 @@ function relatedIdsOf(papers: Map<string, InMemoryPaper>, id: string) {
 }
 
 describe("paper relation integrity helpers", () => {
+  it("preserves existing related ids when an incoming update omits the relation field", () => {
+    const relatedPaperId = "507f1f77bcf86cd7994390aa";
+
+    expect(
+      preserveMissingRelationIds(
+        { relatedPaperIds: [relatedPaperId] },
+        {} as { relatedPaperIds?: string[] }
+      )
+    ).toEqual([relatedPaperId]);
+    expect(
+      preserveMissingRelationIds(
+        { relatedPaperIds: [relatedPaperId] },
+        { relatedPaperIds: [] }
+      )
+    ).toEqual([]);
+  });
+
   it("repairs graphs symmetrically while dropping self, duplicates, invalid, and missing ids", () => {
     const paperA = "507f1f77bcf86cd7994390a1";
     const paperB = "507f1f77bcf86cd7994390a2";
@@ -283,7 +301,7 @@ describe("PaperService relations", () => {
     expect(relatedIdsOf(papers, paperB)).toEqual([paperA]);
   });
 
-  it("cleans deleted paper ids from remaining papers during delete", async () => {
+  it("delete delegates relation cleanup to the repository-side owner", async () => {
     const paperA = "507f1f77bcf86cd799439031";
     const paperB = "507f1f77bcf86cd799439032";
     const paperC = "507f1f77bcf86cd799439033";
@@ -297,9 +315,96 @@ describe("PaperService relations", () => {
     await service.delete([paperB] as any, undefined, true);
 
     expect(Array.from(papers.keys())).toEqual([paperA, paperC]);
-    expect(relatedIdsOf(papers, paperA)).toEqual([paperC]);
-    expect(relatedIdsOf(papers, paperC)).toEqual([paperA]);
+    expect(relatedIdsOf(papers, paperA)).toEqual([paperB, paperC]);
+    expect(relatedIdsOf(papers, paperC)).toEqual([paperA, paperB]);
     expect(repository.delete).toHaveBeenCalled();
+  });
+
+  it("preserves relatedPaperIds across update when the incoming draft omits relations", async () => {
+    const paperA = "507f1f77bcf86cd799439071";
+    const paperB = "507f1f77bcf86cd799439072";
+
+    const existingPaper = createPaper(paperA, [paperB]);
+    const incomingDraft = {
+      _id: paperA,
+      title: "Updated title",
+      authors: "Updated Author",
+      year: "2025",
+    } as any;
+
+    const repositoryUpdate = vi.fn(
+      (
+        _realm: unknown,
+        paperEntity: Entity,
+        _partition: string,
+        _allowUpdate: boolean
+      ) => {
+        const stored = existingPaper;
+        stored.title = paperEntity.title;
+        stored.authors = paperEntity.authors;
+        stored.year = paperEntity.year;
+        stored.relatedPaperIds = paperEntity.relatedPaperIds as ObjectId[];
+        return true;
+      }
+    );
+
+    const repository = {
+      on: vi.fn(),
+      load: vi.fn(() => [existingPaper]),
+      loadByIds: vi.fn((_realm: unknown, ids: Array<string | ObjectId>) =>
+        ids
+          .map((id) => (`${id}` === paperA ? existingPaper : undefined))
+          .filter((paper): paper is InMemoryPaper => Boolean(paper))
+      ),
+      toRealmObject: vi.fn((_realm: unknown, paperEntity: { _id: string | ObjectId }) =>
+        `${paperEntity._id}` === paperA ? existingPaper : undefined
+      ),
+      update: repositoryUpdate,
+    };
+
+    const databaseCore = {
+      getState: vi.fn(() => false),
+      already: vi.fn(),
+      realm: vi.fn(async () => ({ safeWrite: (callback: () => void) => callback() })),
+      getPartition: vi.fn(() => "unit-test"),
+    };
+
+    const noopAsync = vi.fn(async () => undefined);
+    const noopSync = vi.fn(() => undefined);
+
+    const service = new PaperService(
+      databaseCore as any,
+      repository as any,
+      {} as any,
+      {
+        delete: noopAsync,
+        updateFullTextCache: noopSync,
+      } as any,
+      {
+        createTask: noopSync,
+      } as any,
+      {
+        syncFoldersWithLibrary: noopAsync,
+      } as any,
+      {
+        move: vi.fn(async (paper: Entity) => paper),
+        remove: noopSync,
+        moveFile: noopSync,
+        removeFile: noopAsync,
+      } as any,
+      {
+        info: noopSync,
+        warn: noopSync,
+        error: noopSync,
+        progress: noopSync,
+      } as any
+    );
+
+    await service.update([incomingDraft], false, true, true);
+
+    expect(repository.toRealmObject).toHaveBeenCalled();
+    expect(repositoryUpdate).toHaveBeenCalled();
+    expect(existingPaper.relatedPaperIds.map((id) => `${id}`)).toEqual([paperB]);
   });
 
   it("batch relate creates a clique across the selected papers without disturbing outside links", async () => {

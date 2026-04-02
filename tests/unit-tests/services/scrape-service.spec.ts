@@ -25,7 +25,6 @@ describe("ScrapeService PaperEntity bypass compatibility", () => {
       authors: "Refreshed Author",
       year: "2025",
       publication: "Nature",
-      relatedPaperIds: [],
       tags: [],
       folders: [],
       supplementaries: {},

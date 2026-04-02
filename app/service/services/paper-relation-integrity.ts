@@ -26,6 +26,22 @@ export const toObjectIds = (ids: Iterable<string>) => {
   return Array.from(ids).map((id) => new ObjectId(id)) as any;
 };
 
+export const preserveMissingRelationIds = <
+  TPaper extends { relatedPaperIds?: OID[] | string[] }
+>(
+  currentPaper: TPaper,
+  incomingPaper: TPaper
+) => {
+  if (
+    Object.prototype.hasOwnProperty.call(incomingPaper, "relatedPaperIds") &&
+    incomingPaper.relatedPaperIds !== undefined
+  ) {
+    return incomingPaper.relatedPaperIds;
+  }
+
+  return currentPaper.relatedPaperIds;
+};
+
 export const repairRelationGraph = <
   TPaper extends { _id: OID | string; relatedPaperIds?: OID[] | string[] }
 >(

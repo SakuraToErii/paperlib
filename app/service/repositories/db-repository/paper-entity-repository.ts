@@ -167,7 +167,7 @@ export class PaperEntityRepository extends Eventable<IPaperEntityRepositoryState
     paperEntity.type = paperEntity.type || "article";
     paperEntity.supplementaries = paperEntity.supplementaries || [];
     paperEntity.title = `${paperEntity.title}` || "";
-    paperEntity.authors = paperEntity.authors || "";
+    paperEntity.authors = `${paperEntity.authors || ""}`;
     paperEntity.year = paperEntity.year || "";
     paperEntity.rating = paperEntity.rating || 0;
     paperEntity.tags = paperEntity.tags || [];
