@@ -8,6 +8,7 @@ import { Entity, IEntityCollection } from "@/models/entity";
 
 import { HookService, IHookService } from "./hook-service";
 import {
+  ScrapeEntryDraftGroup,
   ScrapeEntryRequest,
   ScrapeFuzzyRequest,
   ScrapeMergeContext,
@@ -23,6 +24,10 @@ import {
   MetadataMergePolicy,
 } from "./scrape-merge-policy";
 import { ScrapeProviderRegistry } from "./scrape-provider-registry";
+import {
+  createStableEntryProviders,
+  StableEntryProvider,
+} from "./scrape-stable-entry-providers";
 import {
   createStableMetadataProviders,
   StableMetadataProvider,
@@ -59,6 +64,7 @@ export class ScrapeService extends Eventable<{}> {
   private readonly _inputResolverRegistry: ScrapeInputResolverRegistry;
   private readonly _providerRegistry: ScrapeProviderRegistry;
   private readonly _metadataMergePolicy: MetadataMergePolicy;
+  private readonly _stableEntryProviders: Map<string, StableEntryProvider>;
   private readonly _stableMetadataProviders: Map<string, StableMetadataProvider>;
 
   private _isPaperEntityPayload(
@@ -107,15 +113,19 @@ export class ScrapeService extends Eventable<{}> {
   protected _executeEntryProvider(
     provider: ScrapeProviderDescriptor,
     request: ScrapeEntryRequest
-  ): Promise<ScrapeProviderResult<Entity[]>> {
-    switch (provider.id) {
-      case "hook:entry":
-        return this._executeHookEntryProvider(provider, request);
-      default:
-        return Promise.resolve(
-          this._createSkippedProviderResult(provider, "payload", [])
-        );
+  ): Promise<ScrapeProviderResult<ScrapeEntryDraftGroup[]>> {
+    const stableEntryProvider = this._stableEntryProviders.get(provider.id);
+    if (stableEntryProvider) {
+      return stableEntryProvider.scrape(request.payloads);
     }
+
+    if (provider.id === "hook:entry") {
+      return this._executeHookEntryProvider(provider, request);
+    }
+
+    return Promise.resolve(
+      this._createSkippedProviderResult(provider, "payload", [])
+    );
   }
 
   protected _executeMetadataProvider(
@@ -217,6 +227,12 @@ export class ScrapeService extends Eventable<{}> {
       new DefaultScrapeInputResolver(),
     ]);
     this._providerRegistry = new ScrapeProviderRegistry();
+    this._stableEntryProviders = new Map(
+      createStableEntryProviders().map((provider) => [
+        provider.descriptor.id,
+        provider,
+      ])
+    );
     this._stableMetadataProviders = new Map(
       createStableMetadataProviders().map((provider) => [
         provider.descriptor.id,
@@ -228,6 +244,9 @@ export class ScrapeService extends Eventable<{}> {
   }
 
   private _registerBuiltinProviders() {
+    for (const provider of this._stableEntryProviders.values()) {
+      this._providerRegistry.register(provider.descriptor);
+    }
     for (const provider of this._stableMetadataProviders.values()) {
       this._providerRegistry.register(provider.descriptor);
     }
@@ -285,7 +304,7 @@ export class ScrapeService extends Eventable<{}> {
   private async _executeHookEntryProvider(
     provider: ScrapeProviderDescriptor,
     request: ScrapeEntryRequest
-  ): Promise<ScrapeProviderResult<Entity[]>> {
+  ): Promise<ScrapeProviderResult<ScrapeEntryDraftGroup[]>> {
     let paperEntityDrafts: Entity[] = [];
 
     if (this._hookService.hasHook("scrapeEntry")) {
@@ -304,7 +323,27 @@ export class ScrapeService extends Eventable<{}> {
       return this._createSkippedProviderResult(provider, "payload", []);
     }
 
-    return this._wrapProviderResult(provider, "payload", paperEntityDrafts);
+    const groupedDrafts: Entity[][] = request.payloads.map(() => []);
+
+    if (request.payloads.length <= 1) {
+      groupedDrafts[0] = paperEntityDrafts;
+    } else {
+      paperEntityDrafts.forEach((draft, index) => {
+        const targetIndex = Math.min(index, request.payloads.length - 1);
+        groupedDrafts[targetIndex].push(new Entity(draft));
+      });
+    }
+
+    return this._wrapProviderResult(
+      provider,
+      "payload",
+      groupedDrafts
+        .map((drafts, payloadIndex) => ({
+          payloadIndex,
+          drafts,
+        }))
+        .filter((group) => group.drafts.length > 0)
+    );
   }
 
   private async _executeHookMetadataProvider(
@@ -390,18 +429,46 @@ export class ScrapeService extends Eventable<{}> {
   }
 
   private async _executeEntryProviderChain(payloads: unknown[]) {
-    const request: ScrapeEntryRequest = {
-      payloads,
-    };
+    let pendingPayloads = payloads.map((payload, originalIndex) => ({
+      payload,
+      originalIndex,
+    }));
+    const resolvedDrafts = new Map<number, Entity[]>();
 
     for (const provider of this._listProviders("entry")) {
-      const result = await this._executeEntryProvider(provider, request);
-      if (result.status === "matched" && result.data.length > 0) {
-        return result.data.map((draft) => new Entity(draft));
+      if (pendingPayloads.length === 0) {
+        break;
       }
+
+      const result = await this._executeEntryProvider(provider, {
+        payloads: pendingPayloads.map((pendingPayload) => pendingPayload.payload),
+      });
+
+      if (result.status !== "matched" || result.data.length === 0) {
+        continue;
+      }
+
+      const matchedPendingIndexes = new Set<number>();
+      for (const group of result.data) {
+        const pendingPayload = pendingPayloads[group.payloadIndex];
+        if (!pendingPayload || group.drafts.length === 0) {
+          continue;
+        }
+
+        matchedPendingIndexes.add(group.payloadIndex);
+        const nextDrafts = resolvedDrafts.get(pendingPayload.originalIndex) || [];
+        nextDrafts.push(...group.drafts.map((draft) => new Entity(draft)));
+        resolvedDrafts.set(pendingPayload.originalIndex, nextDrafts);
+      }
+
+      pendingPayloads = pendingPayloads.filter(
+        (_payload, index) => !matchedPendingIndexes.has(index)
+      );
     }
 
-    return [];
+    return [...resolvedDrafts.entries()]
+      .sort(([leftIndex], [rightIndex]) => leftIndex - rightIndex)
+      .flatMap(([, drafts]) => drafts.map((draft) => new Entity(draft)));
   }
 
   private _mergeMetadataProviderResult(

@@ -46,6 +46,18 @@ export class DefaultScrapeInputResolver implements ScrapeInputResolver {
   private _inferBasis(payload: unknown): ScrapeMatchBasis {
     if (typeof payload === "object" && payload !== null && "type" in payload) {
       const payloadType = String((payload as { type?: unknown }).type || "").toLowerCase();
+      const payloadValue = String((payload as { value?: unknown }).value || "").toLowerCase();
+      if (payloadType.includes("bib")) {
+        return "bibtex";
+      }
+      if (payloadType.includes("file")) {
+        if (payloadValue.endsWith(".bib")) {
+          return "bibtex";
+        }
+        if (payloadValue.endsWith(".pdf")) {
+          return "pdf";
+        }
+      }
       if (payloadType.includes("doi")) {
         return "doi";
       }
