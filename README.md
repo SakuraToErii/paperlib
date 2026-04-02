@@ -94,7 +94,6 @@ This fork adds an Obsidian-style local-folder workflow, paper relations, and a p
 This fork is being developed as a local-first Paperlib variant focused on filesystem-backed organization, paper-to-paper relations, graph navigation, and a durable built-in scraping/import architecture.
 
 ### Current status
-
 Already implemented on this branch:
 
 - Obsidian-style local folder workflow, with folder semantics aligned to real local directories
@@ -117,6 +116,13 @@ Already implemented on this branch:
   - metadata-provider requests can now target built-ins by alias (`doi`, `arxiv`) while still retaining hook fallback
   - mixed `PaperEntity` + entry-payload handling kept compatible with the existing refresh/import flows
   - targeted regression coverage for scrape-service boundaries, browser-extension import boundaries, and PaperService refresh boundaries
+- Phase 2 execution slice 2 for the durable built-in scraping/import path:
+  - built-in entry-provider chaining now exists ahead of `hook:entry`
+  - BibTeX entry parsing is now internalized as an app-owned provider
+  - generic HTML/webcontent metadata bootstrap is now internalized as an app-owned provider
+  - PDF identifier bootstrap now extracts durable IDs and feeds the app-owned pipeline
+  - entry-provider results are grouped per payload so built-in matches can coexist with hook fallback
+  - targeted regression coverage now exists for the built-in entry-provider chain
 - Local library onboarding hardening:
   - `PaperService.create()` restored to the real scrape/import path instead of the previous placeholder draft path
   - filename-based fallback metadata is still preserved when scrape results are missing or incomplete
@@ -130,31 +136,28 @@ Already implemented on this branch:
   - bootstrap is now regression-covered for the “skip when file storage is not local” path
 
 ### Short-term plan
+1. Harden and manually validate the now-landed stable-provider core
 
-1. Finish the remaining stable-provider slices for the durable internal scraping/import architecture
-
-- Continue replacing plugin-style core scraping behavior with internal provider/resolver/merge/persistence seams.
-- Stable-source migration status:
-  - done: DOI
-  - done: arXiv
-  - done: stable metadata-provider registry integration / alias-based routing / targeted regression coverage
-  - next: BibTeX
-  - next: generic HTML metadata
-  - next: PDF bootstrap that extracts durable identifiers and hands off to built-in providers
+- Keep the newly landed stable sources credible as the default app-owned path:
+  - done: DOI metadata
+  - done: arXiv metadata
+  - done: metadata-provider registry integration / alias-based routing / targeted regression coverage
+  - done: built-in BibTeX entry provider
+  - done: built-in generic HTML/webcontent entry provider
+  - done: built-in PDF identifier bootstrap entry provider
+- Re-check the remaining caller-boundary behavior:
+  - browser import
+  - file import / local-library bootstrap
+  - refresh/update preservation of local-managed fields
 - Keep volatile site-specific scrapers isolated and modular.
-- Make the merge/finalization boundary more explicit so refresh/import still preserves local-managed fields by default:
-  - `relatedPaperIds`
-  - folders
-  - tags
-  - notes
-  - managed files / file placement
 - Keep the hook-backed provider path as compatibility fallback rather than the primary architecture anchor.
 
-2. Keep hardening the local-first data model
+2. Make the next graph/database seam the main active branch priority
 
-- Continue reducing legacy persistence residue.
-- Prepare the migration seam from `relatedPaperIds` adjacency lists to a future edge-based relation model.
-- Add more regression coverage around local folder/file edge cases and the remaining scrape update flows.
+- Move from `relatedPaperIds` adjacency reads toward a dedicated relation/graph read gateway.
+- Keep graph/query acceleration isolated from scrape/import churn.
+- Continue reducing legacy persistence residue where that does not broaden scope.
+- Add more regression coverage around local folder/file edge cases and relation-read behavior.
 
 ### Long-term plan
 
@@ -177,54 +180,67 @@ Already implemented on this branch:
 - Keep the graph useful on large literature libraries without sacrificing the app’s current visual style.
 
 ### Current branch notes
-
 Working branch:
 
 - `feat/obsidian-folder-graph`
+
+Latest verified leader checkpoint for quick resume:
+
+- commit: `fcb94e9` — `Make the stable entry-provider slice verifiable on the leader branch`
+- previous handoff checkpoint: `dfd9d2a` — verified graph/database handoff note
 
 ### Session resume snapshot
 
 If you start a fresh session later, this is the quickest way to resume the branch intelligently.
 
 #### What is already true now
-
 - Local folder semantics, paper relations, and the graph view are already implemented and regression-covered.
 - Built-in DOI and arXiv metadata providers are already in the app-side scrape pipeline.
 - Stable metadata providers are now routed through the provider registry instead of special-cased `ScrapeService` branches.
 - Requested provider filtering now supports stable-provider aliases while keeping hook fallback available.
+- Built-in entry providers now exist ahead of `hook:entry` for:
+  - BibTeX payloads / `.bib` files
+  - generic HTML/webcontent metadata
+  - PDF identifier bootstrap
+- The app-side scrape pipeline now supports built-in entry-provider chaining with hook fallback for unmatched payloads.
 - `PaperService.create()` now uses the real scrape/import path again, with filename fallback only as a safety net.
 - Selecting a brand-new local library folder that already contains PDFs now bootstraps those PDFs into the library automatically.
 - Cloud/WebDAV is still present for compatibility, but it is no longer framed as the primary product direction in preferences.
 - Database bootstrap regressions now explicitly cover “flexible sync enabled” and “non-local file storage” skip paths.
+- Leader-side verification for the current checkpoint passes:
+  - `rtk pnpm run typecheck`
+  - focused scrape/import/graph regression suites
+  - `rtk pnpm exec prettier --check docs/plans/2026-04-02-phase2-graph-db-performance-handoff.md`
 
 #### What is not finished yet
-
-- There is still no built-in entry-provider fallback for the remaining stable import inputs.
-- BibTeX entry/import is still not internalized as the default app-owned path.
-- Generic HTML metadata bootstrap is still not internalized as the default app-owned path.
-- PDF identifier bootstrap for the scrape pipeline itself is still pending.
+- The newly landed built-in entry-provider slice still needs manual in-app smoke validation for real BibTeX / HTML / PDF imports.
+- The merge/finalization boundary should still be reviewed whenever refresh/update behavior is touched:
+  - `relatedPaperIds`
+  - folders
+  - tags
+  - notes
+  - managed files / file placement
 - The graph still reads from the current `relatedPaperIds` adjacency model; canonical edge storage and graph-read APIs are not implemented yet.
+- Large-library performance work is still a roadmap item, not a finished branch capability.
 
 #### Recommended next session
-
 The best next execution slice is:
 
-1. finish the remaining stable built-in entry/import slice:
-   - add a built-in entry-provider fallback ahead of `hook:entry`
-   - BibTeX
-   - generic HTML metadata
-   - PDF identifier bootstrap for the scrape pipeline itself (distinct from the new local-library bootstrap)
-2. keep strengthening the local-first data model:
-   - reduce legacy cloud/sync residue where safe
-   - keep merge/finalization boundaries explicit
-   - preserve local-managed fields by default
-3. start the next graph-performance seam:
-   - move from `relatedPaperIds` adjacency lists toward canonical edge storage
-   - add relation/graph read APIs
-   - reduce whole-library scans for large libraries
+1. do a manual smoke pass for the newly landed stable entry-provider slice:
+   - real BibTeX import
+   - real browser/webcontent import
+   - real PDF bootstrap import
+   - confirm hook fallback still behaves sanely when built-ins do not match
+2. start the next graph/database seam:
+   - add a dedicated relation/graph read gateway
+   - begin separating read APIs from the current adjacency-list storage shape
+   - keep renderer consumers moving toward the gateway rather than deeper direct storage coupling
+3. only after the read gateway is stable, begin the canonical edge-storage migration:
+   - relation/graph read APIs
+   - large-library query improvements
+   - reduced whole-library scans
 
 #### Best files to read first in a new session
-
 - `README.md`
 - `docs/plans/phase1-local-db-contract.md`
 - `docs/plans/phase1-edge-migration-seam.md`
@@ -234,31 +250,36 @@ The best next execution slice is:
 - `docs/plans/2026-04-02-phase2-graph-db-performance-handoff.md`
 - `app/service/services/paper-service.ts`
 - `app/service/services/database-service.ts`
+- `app/service/services/scrape-contract.ts`
 - `app/service/services/scrape-service.ts`
 - `app/service/services/scrape-provider-registry.ts`
 - `app/service/services/scrape-builtin-metadata.ts`
+- `app/service/services/scrape-stable-entry-providers.ts`
 - `app/service/services/scrape-stable-metadata-providers.ts`
 - `app/renderer/ui/preference-view/cloud-view.vue`
 - `tests/unit-tests/services/paper-service-create.spec.ts`
 - `tests/unit-tests/services/database-service.spec.ts`
 - `tests/unit-tests/services/scrape-service.spec.ts`
+- `tests/unit-tests/services/scrape-stable-entry-provider-chain.spec.ts`
+- `tests/unit-tests/services/scrape-stable-entry-providers.spec.ts`
 - `tests/unit-tests/services/scrape-stable-metadata-providers.spec.ts`
 
 #### Current known risks / gaps
-
 - The new local-library bootstrap is unit-tested, but not yet validated with a full interactive Electron smoke test.
-- The scrape pipeline still needs the remaining stable built-in entry/import path before the internal architecture is fully credible as the default long-term path.
+- The new built-in entry-provider slice is verified at type/test level, but still needs real interactive import checks before it should be treated as fully settled.
 - The graph still reads from the current `relatedPaperIds` adjacency model, so large-library scalability work remains open.
 - Cloud/WebDAV has been de-emphasized in UI, but the compatibility backend still exists and should be removed only carefully.
-- Large-library query performance is still a roadmap item, not a finished branch capability.
+- The team-run auto-checkpoint commits are useful historical breadcrumbs, but the leader commit `fcb94e9` is the real resume point to trust.
 
 #### Suggested verification when resuming work
 
 Run at minimum:
 
 ```bash
-pnpm run typecheck
-pnpm exec vitest run \
+rtk pnpm run typecheck
+rtk pnpm exec vitest run --exclude '.omx/**' \
+  tests/unit-tests/services/scrape-stable-entry-providers.spec.ts \
+  tests/unit-tests/services/scrape-stable-entry-provider-chain.spec.ts \
   tests/unit-tests/services/scrape-stable-metadata-providers.spec.ts \
   tests/unit-tests/services/paper-service-create.spec.ts \
   tests/unit-tests/services/database-service.spec.ts \
@@ -269,7 +290,31 @@ pnpm exec vitest run \
 If the next session touches graph/relation code, also rerun the graph/relation suites:
 
 ```bash
-pnpm exec vitest run \
+rtk pnpm exec vitest run --exclude '.omx/**' \
+  tests/unit-tests/services/paper-relations.spec.ts \
+  tests/unit-tests/renderer/paper-graph.spec.ts \
+  tests/unit-tests/renderer/paper-graph-view.spec.ts
+```
+
+If you need the exact current leader checkpoint before starting, confirm it with:
+
+```bash
+rtk git branch --show-current
+rtk git log --oneline -3
+```
+
+If you want the wider current regression floor for the entry-provider slice, run:
+
+```bash
+rtk pnpm exec vitest run --exclude '.omx/**' \
+  tests/unit-tests/services/scrape-stable-metadata-providers.spec.ts \
+  tests/unit-tests/services/scrape-stable-entry-providers.spec.ts \
+  tests/unit-tests/services/scrape-stable-entry-provider-chain.spec.ts \
+  tests/unit-tests/services/paper-service-create.spec.ts \
+  tests/unit-tests/services/database-service.spec.ts \
+  tests/unit-tests/services/file-service.spec.ts \
+  tests/unit-tests/services/browser-extension-service.spec.ts \
+  tests/unit-tests/services/scrape-service.spec.ts \
   tests/unit-tests/services/paper-relations.spec.ts \
   tests/unit-tests/renderer/paper-graph.spec.ts \
   tests/unit-tests/renderer/paper-graph-view.spec.ts
