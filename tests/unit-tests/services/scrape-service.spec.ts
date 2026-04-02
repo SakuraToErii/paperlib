@@ -2,7 +2,81 @@ import { describe, expect, it, vi } from "vitest";
 
 import { mergeMetadata } from "../../../app/base/metadata";
 import { Entity } from "../../../app/models/entity";
+import { DefaultMetadataMergePolicy } from "../../../app/service/services/scrape-merge-policy";
+import { ScrapeProviderRegistry } from "../../../app/service/services/scrape-provider-registry";
 import { ScrapeService } from "../../../app/service/services/scrape-service";
+
+describe("ScrapeService Slice 2 scaffolding", () => {
+  it("orders registry providers by priority and replaces duplicate ids", () => {
+    const registry = new ScrapeProviderRegistry();
+
+    registry.register({ id: "slow", kind: "metadata", priority: 20 });
+    registry.register({ id: "fast", kind: "metadata", priority: 10 });
+    registry.register({ id: "slow", kind: "metadata", priority: 5, label: "replaced" });
+
+    expect(registry.list("metadata")).toEqual([
+      { id: "slow", kind: "metadata", priority: 5, label: "replaced" },
+      { id: "fast", kind: "metadata", priority: 10 },
+    ]);
+    expect(registry.get("metadata", "slow")?.label).toBe("replaced");
+  });
+
+  it("merge policy delegates to mergeMetadata while allowing force refresh priority override", () => {
+    const policy = new DefaultMetadataMergePolicy();
+    const origin = new Entity({
+      _id: "507f1f77bcf86cd799439011",
+      title: "Original Title",
+      authors: "Seed Author",
+      year: "2024",
+      publication: "arXiv",
+      tags: [],
+      folders: [],
+      supplementaries: {},
+    });
+    const draft = new Entity(origin);
+    const higherPriorityMerged = policy.merge(
+      origin,
+      new Entity(origin),
+      {
+        provider: { id: "provider-a", kind: "metadata" },
+        status: "matched",
+        basis: "paper-entity",
+        data: new Entity({
+          ...origin,
+          title: "Updated Title",
+          publication: "Nature",
+        }),
+        warnings: [],
+      },
+      { title: Number.POSITIVE_INFINITY, publication: Number.POSITIVE_INFINITY },
+      { providerId: "provider-a", providerIndex: 3, force: false }
+    );
+
+    expect(higherPriorityMerged.paperEntityDraft.title).toBe("Updated Title");
+    expect(higherPriorityMerged.mergePriorityLevel.title).toBe(3);
+
+    const forcedMerged = policy.merge(
+      origin,
+      draft,
+      {
+        provider: { id: "provider-b", kind: "metadata" },
+        status: "matched",
+        basis: "paper-entity",
+        data: new Entity({
+          ...origin,
+          title: "Forced Title",
+          publication: "Science",
+        }),
+        warnings: [],
+      },
+      { title: 0, publication: 0 },
+      { providerId: "provider-b", providerIndex: 99, force: true }
+    );
+
+    expect(forcedMerged.paperEntityDraft.title).toBe("Forced Title");
+    expect(forcedMerged.paperEntityDraft.publication).toBe("Science");
+  });
+});
 
 describe("ScrapeService PaperEntity bypass compatibility", () => {
   it("preserves existing relatedPaperIds when metadata refresh omits relation fields", () => {
