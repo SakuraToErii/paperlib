@@ -224,11 +224,10 @@ export class DOIMetadataProvider extends BaseStableMetadataProvider {
   constructor(options: StableMetadataProviderOptions = {}) {
     super(
       {
-        id: "builtin:doi",
+        id: "builtin:doi-metadata",
         kind: "metadata",
         label: "Builtin DOI metadata provider",
         priority: 10,
-        aliases: ["doi"],
       },
       options
     );
@@ -297,11 +296,10 @@ export class ArxivMetadataProvider extends BaseStableMetadataProvider {
   constructor(options: StableMetadataProviderOptions = {}) {
     super(
       {
-        id: "builtin:arxiv",
+        id: "builtin:arxiv-metadata",
         kind: "metadata",
         label: "Builtin arXiv metadata provider",
         priority: 20,
-        aliases: ["arxiv"],
       },
       options
     );

@@ -27,32 +27,8 @@ export class ScrapeProviderRegistry {
     this._providersByKind.set(provider.kind, providersWithoutCurrent);
   }
 
-  list(
-    kind: ScrapeProviderKind,
-    requestedProviderIds: string[] = []
-  ): ScrapeProviderDescriptor[] {
-    const providers = [...(this._providersByKind.get(kind) || [])];
-    if (requestedProviderIds.length === 0) {
-      return providers;
-    }
-
-    const normalizedRequestedProviderIds = requestedProviderIds.map((providerId) =>
-      providerId.toLowerCase()
-    );
-
-    return providers.filter((provider) => {
-      if (provider.id.startsWith("hook:")) {
-        return true;
-      }
-
-      const providerNames = [provider.id, ...(provider.aliases || [])].map(
-        (providerName) => providerName.toLowerCase()
-      );
-
-      return providerNames.some((providerName) =>
-        normalizedRequestedProviderIds.includes(providerName)
-      );
-    });
+  list(kind: ScrapeProviderKind): ScrapeProviderDescriptor[] {
+    return [...(this._providersByKind.get(kind) || [])];
   }
 
   get(
