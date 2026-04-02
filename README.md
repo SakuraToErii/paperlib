@@ -96,6 +96,7 @@ This fork is being developed as a local-first Paperlib variant focused on filesy
 ### Current status
 
 Already implemented on this branch:
+
 - Obsidian-style local folder workflow, with folder semantics aligned to real local directories
 - paper-to-paper relations stored on the current `relatedPaperIds` model
 - graph view with paper-only nodes, publication-time-derived edge direction, relation-count-driven node sizing, and folder-family-based coloring
@@ -109,42 +110,54 @@ Already implemented on this branch:
   - provider inventory and migration priorities
   - safe merge/update policy docs
   - initial internal scrape resolver/provider/merge scaffolding in the service layer
+- Phase 2 execution slice 1 for the durable built-in scraping/import path:
+  - prioritized metadata-provider chaining in `ScrapeService`
+  - built-in DOI and arXiv metadata providers ahead of hook-based compatibility fallback
+  - mixed `PaperEntity` + entry-payload handling kept compatible with the existing refresh/import flows
+  - targeted regression coverage for scrape-service boundaries, browser-extension import boundaries, and PaperService refresh boundaries
 
 ### Short-term plan
 
-1. Finish the durable internal scraping/import architecture
+1. Finish the remaining stable-provider slices for the durable internal scraping/import architecture
+
 - Continue replacing plugin-style core scraping behavior with internal provider/resolver/merge/persistence seams.
-- Internalize stable sources first:
-  - DOI
-  - arXiv
-  - BibTeX
-  - generic HTML metadata
+- Stable-source migration status:
+  - done: DOI
+  - done: arXiv
+  - next: BibTeX
+  - next: generic HTML metadata
+  - next: PDF bootstrap that extracts durable identifiers and hands off to built-in providers
 - Keep volatile site-specific scrapers isolated and modular.
-- Preserve local-managed fields by default during refresh/import:
+- Make the merge/finalization boundary more explicit so refresh/import still preserves local-managed fields by default:
   - `relatedPaperIds`
   - folders
   - tags
   - notes
   - managed files / file placement
+- Keep the hook-backed provider path as compatibility fallback rather than the primary architecture anchor.
 
 2. Keep hardening the local-first data model
+
 - Continue reducing legacy persistence residue.
 - Prepare the migration seam from `relatedPaperIds` adjacency lists to a future edge-based relation model.
-- Add more regression coverage around local folder/file edge cases and scraping update flows.
+- Add more regression coverage around local folder/file edge cases and the remaining scrape update flows.
 
 ### Long-term plan
 
 1. High-performance local database and graph queries
+
 - Migrate from adjacency-list relation storage toward canonical edge storage.
 - Add dedicated relation/graph read APIs.
 - Reduce whole-library scans and improve large-library performance.
 
 2. Local-first library portability instead of app-level cloud sync
+
 - Prioritize using iCloud / OneDrive / Dropbox / Syncthing style folder replication for the library.
 - Keep Paperlib semantics local-first rather than depending on app-managed cloud sync.
 - Improve resilience and repair tooling for cloud-folder-backed local libraries.
 
 3. Obsidian-inspired high-performance graph experience
+
 - Expand from the current graph view to more scalable graph data services.
 - Add stronger neighborhood, filtering, and incremental graph-read capabilities.
 - Keep the graph useful on large literature libraries without sacrificing the app’s current visual style.
@@ -152,9 +165,11 @@ Already implemented on this branch:
 ### Current branch notes
 
 Working branch:
+
 - `feat/obsidian-folder-graph`
 
 Recent planning/reference docs for this fork:
+
 - `docs/plans/phase1-local-db-contract.md`
 - `docs/plans/phase1-legacy-persistence-audit.md`
 - `docs/plans/phase1-edge-migration-seam.md`
@@ -184,6 +199,7 @@ pnpm install
 ```
 
 Requirements:
+
 - Node.js 20.14+
 - pnpm (v9 recommended; pnpm v10 requires approving install/build scripts for native/Electron deps)
 
@@ -203,6 +219,7 @@ pnpm install
 Without that approval, pnpm skips Electron's install script, `node_modules/electron/dist` is never downloaded, and `pnpm run dev` fails with `Error: Electron uninstall`.
 
 Fresh-machine note:
+
 - `pnpm install` can succeed while still skipping Electron's postinstall download if your pnpm config requires explicit approval for build scripts.
 - If `pnpm run dev` fails with `Error: Electron uninstall` or `Electron failed to install correctly`, approve the blocked build scripts and reinstall/rebuild Electron.
 
@@ -249,6 +266,7 @@ Before testing the new behavior, prepare a clean local paper library on your mac
 ```
 
 Import several PDFs into different folders so that you can verify:
+
 - top-level folder color families (for example RL / LLM / Robot)
 - child-folder shade variations inside the same family
 - recursive folder browsing behavior
@@ -257,6 +275,7 @@ Import several PDFs into different folders so that you can verify:
 ### 4. Manual test checklist
 
 #### Folder structure behavior
+
 - Create a folder from the app and confirm the real local directory is created.
 - Rename a folder and confirm the real local directory is renamed.
 - Move a folder and confirm the real local directory moves with it.
@@ -266,6 +285,7 @@ Import several PDFs into different folders so that you can verify:
 - Drag a paper into another folder and confirm its managed local path is updated.
 
 #### Related papers behavior
+
 - Open a paper detail panel and add related papers.
 - Confirm the relation is visible from both papers.
 - Remove a relation and confirm it disappears from both sides.
@@ -273,6 +293,7 @@ Import several PDFs into different folders so that you can verify:
 - If available in your current UI flow, try batch relate / batch unrelate from multiple selected papers.
 
 #### Graph view behavior
+
 - Switch between list, table, and graph views.
 - Confirm the graph reflects the current query, search, and folder scope.
 - Confirm each paper appears as one node and attachments are excluded.
@@ -282,6 +303,7 @@ Import several PDFs into different folders so that you can verify:
 - Confirm click, double-click, hover, zoom, pan, focus-selected, neighborhood mode, back-to-whole-graph, and reset behaviors work correctly.
 
 #### Regression checks
+
 - Edit tags and confirm tags still work independently from folders.
 - Restart the app and confirm folders, relations, and graph data remain consistent.
 - Run a full typecheck before submitting changes:
@@ -322,19 +344,23 @@ Use the platform-specific build scripts in `package.json` for other targets.
 ## Usage Demos
 
 ### Scrape metadata for conference papers such as ICLR, ICML, NeurIPS
+
 <img src="https://github.com/Future-Scholars/paperlib/assets/14183213/4ffc556e-ba9c-48f3-9066-0370487a90ca" style="width: 70%" />
 
-
 ### Smooth paper writing integration with any editors.
+
 <img src="https://github.com/Future-Scholars/paperlib/assets/14183213/fefb4e9e-7d6e-4259-b4f1-bc7109c87802" style="width: 70%" />
 
 ### Summarize your papers by LLM. Tag your papers by LLM
+
 <img src="https://github.com/Future-Scholars/paperlib/assets/14183213/87040ded-dd4a-470a-bceb-73cd9d334cc3" style="width: 70%" />
 
 ### Organize your library with tags, folders and smart filters
+
 <img src="https://github.com/Future-Scholars/paperlib/assets/14183213/391ee552-a3be-4e16-8023-e1c57ba45481" style="width: 70%" />
 
 ### Three view mode
+
 <img src="https://github.com/Future-Scholars/paperlib/assets/14183213/c8a06b1d-0dc2-4291-9f4b-d38b01e760c2" style="width: 70%" />
 
 ## Sponsors
@@ -343,12 +369,9 @@ Use the platform-specific build scripts in `package.json` for other targets.
 
 <a href="cloudflare.com"><img src="https://blog.cloudflare.com/content/images/2022/10/CF_logo_stacked_blktype.png" style="width: 160px"/></a>
 
-
 <a href="https://www.digitalocean.com/">
   <img src="https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/SVG/DO_Logo_horizontal_blue.svg" width="160px">
 </a>
-
-
 
 ## Contribute to Paperlib
 

@@ -4,19 +4,25 @@ import { createDecorator } from "@/base/injection/injection";
 import { Process } from "@/base/process-id";
 import { ILogService, LogService } from "@/common/services/log-service";
 import { ProcessingKey, processing } from "@/common/utils/processing";
-import { IEntityCollection, Entity } from "@/models/entity";
+import { Entity, IEntityCollection } from "@/models/entity";
 
+import { HookService, IHookService } from "./hook-service";
+import { executeBuiltinMetadataProvider } from "./scrape-builtin-metadata";
 import {
-  DefaultMetadataMergePolicy,
-  MetadataMergePolicy,
-} from "./scrape-merge-policy";
-import {
+  ScrapeEntryRequest,
+  ScrapeFuzzyRequest,
   ScrapeMergeContext,
+  ScrapeMetadataProviderExecution,
+  ScrapeMetadataRequest,
   ScrapeProviderDescriptor,
   ScrapeProviderKind,
   ScrapeProviderResult,
   ScrapeSeed,
 } from "./scrape-contract";
+import {
+  DefaultMetadataMergePolicy,
+  MetadataMergePolicy,
+} from "./scrape-merge-policy";
 import { ScrapeProviderRegistry } from "./scrape-provider-registry";
 import {
   DefaultScrapeInputResolver,
@@ -24,7 +30,6 @@ import {
   PaperEntityPayload,
   ScrapeInputResolverRegistry,
 } from "./scrape-resolver";
-import { HookService, IHookService } from "./hook-service";
 
 export const IScrapeService = createDecorator("scrapeService");
 
@@ -52,7 +57,9 @@ export class ScrapeService extends Eventable<{}> {
   private readonly _providerRegistry: ScrapeProviderRegistry;
   private readonly _metadataMergePolicy: MetadataMergePolicy;
 
-  private _isPaperEntityPayload(payload: unknown): payload is PaperEntityPayload {
+  private _isPaperEntityPayload(
+    payload: unknown
+  ): payload is PaperEntityPayload {
     return this._resolvePayload(payload).kind === "entity-draft";
   }
 
@@ -64,12 +71,20 @@ export class ScrapeService extends Eventable<{}> {
     return payloads.map((payload) => this._resolvePayload(payload));
   }
 
-  protected _selectProvider(kind: ScrapeProviderKind): ScrapeProviderDescriptor {
-    const provider = this._providerRegistry.list(kind)[0];
-    if (!provider) {
+  protected _listProviders(
+    kind: ScrapeProviderKind
+  ): ScrapeProviderDescriptor[] {
+    const providers = this._providerRegistry.list(kind);
+    if (providers.length === 0) {
       throw new Error(`No scrape provider registered for ${kind}.`);
     }
-    return provider;
+    return providers;
+  }
+
+  protected _selectProvider(
+    kind: ScrapeProviderKind
+  ): ScrapeProviderDescriptor {
+    return this._listProviders(kind)[0];
   }
 
   protected _createMergeContext(
@@ -86,34 +101,60 @@ export class ScrapeService extends Eventable<{}> {
 
   protected _executeEntryProvider(
     provider: ScrapeProviderDescriptor,
-    payloads: unknown[]
+    request: ScrapeEntryRequest
   ): Promise<ScrapeProviderResult<Entity[]>> {
-    return this._executeHookEntryProvider(provider, payloads);
+    switch (provider.id) {
+      case "hook:entry":
+        return this._executeHookEntryProvider(provider, request);
+      default:
+        return Promise.resolve(
+          this._createSkippedProviderResult(provider, "payload", [])
+        );
+    }
   }
 
   protected _executeMetadataProvider(
     provider: ScrapeProviderDescriptor,
-    paperEntityDrafts: Entity[],
-    scrapers: string[],
-    force: boolean
-  ): Promise<{
-    result: ScrapeProviderResult<Entity[]>;
-    scrapers: string[];
-    force: boolean;
-  }> {
-    return this._executeHookMetadataProvider(
-      provider,
-      paperEntityDrafts,
-      scrapers,
-      force
-    );
+    request: ScrapeMetadataRequest
+  ): Promise<ScrapeMetadataProviderExecution> {
+    switch (provider.id) {
+      case "builtin:doi":
+      case "builtin:arxiv":
+        return executeBuiltinMetadataProvider(provider, request);
+      case "hook:metadata":
+        return this._executeHookMetadataProvider(provider, request);
+      default:
+        return Promise.resolve({
+          result: this._createSkippedProviderResult(
+            provider,
+            request.drafts.some((draft) => !!draft.doi)
+              ? "doi"
+              : request.drafts.some((draft) => !!draft.arxiv)
+              ? "arxiv"
+              : "paper-entity",
+            request.drafts.map((draft) => new Entity(draft))
+          ),
+          request: {
+            drafts: request.drafts.map((draft) => new Entity(draft)),
+            scrapers: [...request.scrapers],
+            force: request.force,
+          },
+        });
+    }
   }
 
   protected _executeFuzzyProvider(
     provider: ScrapeProviderDescriptor,
-    paperEntities: IEntityCollection
+    request: ScrapeFuzzyRequest
   ): Promise<ScrapeProviderResult<Entity[][]>> {
-    return this._executeHookFuzzyProvider(provider, paperEntities);
+    switch (provider.id) {
+      case "hook:fuzzy":
+        return this._executeHookFuzzyProvider(provider, request);
+      default:
+        return Promise.resolve(
+          this._createSkippedProviderResult(provider, "paper-entity", [])
+        );
+    }
   }
 
   protected _applyMetadataMergePolicy(
@@ -132,17 +173,25 @@ export class ScrapeService extends Eventable<{}> {
     );
   }
 
-  private _getPaperEntityDraftsFromPayloads(payloads: unknown[]): Entity[] | null {
+  private _getPaperEntityDraftsFromPayloads(
+    payloads: unknown[]
+  ): Entity[] | null {
     if (payloads.length === 0) {
       return null;
     }
 
     const resolvedPayloads = this._resolveSeeds(payloads);
-    if (!resolvedPayloads.every((resolvedPayload) => resolvedPayload.kind === "entity-draft")) {
+    if (
+      !resolvedPayloads.every(
+        (resolvedPayload) => resolvedPayload.kind === "entity-draft"
+      )
+    ) {
       return null;
     }
 
-    return resolvedPayloads.map((resolvedPayload) => new Entity(resolvedPayload.entity));
+    return resolvedPayloads.map(
+      (resolvedPayload) => new Entity(resolvedPayload.entity)
+    );
   }
 
   constructor(
@@ -160,6 +209,18 @@ export class ScrapeService extends Eventable<{}> {
   }
 
   private _registerBuiltinProviders() {
+    this._providerRegistry.register({
+      id: "builtin:doi",
+      kind: "metadata",
+      label: "Built-in DOI metadata provider",
+      priority: 10,
+    });
+    this._providerRegistry.register({
+      id: "builtin:arxiv",
+      kind: "metadata",
+      label: "Built-in arXiv metadata provider",
+      priority: 20,
+    });
     this._providerRegistry.register({
       id: "hook:entry",
       kind: "entry",
@@ -196,21 +257,41 @@ export class ScrapeService extends Eventable<{}> {
     };
   }
 
+  private _createSkippedProviderResult<TData>(
+    provider: ScrapeProviderDescriptor,
+    basis: ScrapeProviderResult<TData>["basis"],
+    data: TData
+  ): ScrapeProviderResult<TData> {
+    return {
+      provider,
+      status: "skipped",
+      basis,
+      data,
+      complete: false,
+      warnings: [],
+    };
+  }
+
   private async _executeHookEntryProvider(
     provider: ScrapeProviderDescriptor,
-    payloads: unknown[]
+    request: ScrapeEntryRequest
   ): Promise<ScrapeProviderResult<Entity[]>> {
     let paperEntityDrafts: Entity[] = [];
 
     if (this._hookService.hasHook("scrapeEntry")) {
-      const hookedPaperEntityDrafts = await this._hookService.transformhookPoint<any[], object[]>(
-        "scrapeEntry",
-        600000,
-        payloads
-      );
+      const hookedPaperEntityDrafts =
+        await this._hookService.transformhookPoint<any[], object[]>(
+          "scrapeEntry",
+          600000,
+          request.payloads
+        );
       paperEntityDrafts = hookedPaperEntityDrafts.map((paperEntityDraft) => {
         return new Entity(paperEntityDraft);
       });
+    }
+
+    if (paperEntityDrafts.length === 0) {
+      return this._createSkippedProviderResult(provider, "payload", []);
     }
 
     return this._wrapProviderResult(provider, "payload", paperEntityDrafts);
@@ -218,56 +299,67 @@ export class ScrapeService extends Eventable<{}> {
 
   private async _executeHookMetadataProvider(
     provider: ScrapeProviderDescriptor,
-    paperEntityDrafts: Entity[],
-    scrapers: string[],
-    force: boolean
-  ): Promise<{
-    result: ScrapeProviderResult<Entity[]>;
-    scrapers: string[];
-    force: boolean;
-  }> {
-    let scrapedPaperEntityDrafts = paperEntityDrafts;
+    request: ScrapeMetadataRequest
+  ): Promise<ScrapeMetadataProviderExecution> {
+    let scrapedPaperEntityDrafts = request.drafts.map(
+      (draft) => new Entity(draft)
+    );
+    let nextScrapers = [...request.scrapers];
+    let nextForce = request.force;
 
     if (this._hookService.hasHook("scrapeMetadata")) {
       const metadataHookResult = await this._hookService.modifyHookPoint(
         "scrapeMetadata",
         60000,
-        paperEntityDrafts,
-        scrapers,
-        force
+        request.drafts,
+        request.scrapers,
+        request.force
       );
       scrapedPaperEntityDrafts = metadataHookResult[0].map(
         (draft: Entity) => new Entity(draft)
       );
-      [, scrapers, force] = metadataHookResult;
+      [, nextScrapers, nextForce] = metadataHookResult;
     }
 
     return {
-      result: this._wrapProviderResult(
-        provider,
-        "paper-entity",
-        scrapedPaperEntityDrafts
-      ),
-      scrapers,
-      force,
+      result: this._hookService.hasHook("scrapeMetadata")
+        ? this._wrapProviderResult(
+            provider,
+            "paper-entity",
+            scrapedPaperEntityDrafts
+          )
+        : this._createSkippedProviderResult(
+            provider,
+            "paper-entity",
+            scrapedPaperEntityDrafts
+          ),
+      request: {
+        drafts: scrapedPaperEntityDrafts,
+        scrapers: nextScrapers,
+        force: nextForce,
+      },
     };
   }
 
   private async _executeHookFuzzyProvider(
     provider: ScrapeProviderDescriptor,
-    paperEntities: IEntityCollection
+    request: ScrapeFuzzyRequest
   ): Promise<ScrapeProviderResult<Entity[][]>> {
     let paperEntityDraftCandidates: Entity[][] = [];
 
     if (this._hookService.hasHook("fuzzyScrapeMetadata")) {
-      const hookedCandidates = await this._hookService.transformhookPoint<any[], object[]>(
-        "fuzzyScrapeMetadata",
-        600000,
-        paperEntities
+      const hookedCandidates = await this._hookService.transformhookPoint<
+        any[],
+        object[]
+      >("fuzzyScrapeMetadata", 600000, request.paperEntities);
+      paperEntityDraftCandidates = hookedCandidates.map(
+        (candidateGroup: object[]) =>
+          candidateGroup.map((candidate) => new Entity(candidate))
       );
-      paperEntityDraftCandidates = hookedCandidates.map((candidateGroup: object[]) =>
-        candidateGroup.map((candidate) => new Entity(candidate))
-      );
+    }
+
+    if (paperEntityDraftCandidates.length === 0) {
+      return this._createSkippedProviderResult(provider, "paper-entity", []);
     }
 
     return this._wrapProviderResult(
@@ -275,6 +367,128 @@ export class ScrapeService extends Eventable<{}> {
       "paper-entity",
       paperEntityDraftCandidates
     );
+  }
+
+  private _createMergePriorityLevel(draft: Entity) {
+    return Object.keys(draft as unknown as Record<string, unknown>).reduce(
+      (acc, key) => {
+        acc[key] = Number.POSITIVE_INFINITY;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
+  }
+
+  private async _executeEntryProviderChain(payloads: unknown[]) {
+    const request: ScrapeEntryRequest = {
+      payloads,
+    };
+
+    for (const provider of this._listProviders("entry")) {
+      const result = await this._executeEntryProvider(provider, request);
+      if (result.status === "matched" && result.data.length > 0) {
+        return result.data.map((draft) => new Entity(draft));
+      }
+    }
+
+    return [];
+  }
+
+  private _mergeMetadataProviderResult(
+    origin: Entity,
+    draft: Entity,
+    result: ScrapeProviderResult<Entity>,
+    mergePriorityLevel: Record<string, number>,
+    context: ScrapeMergeContext
+  ) {
+    return this._applyMetadataMergePolicy(
+      origin,
+      draft,
+      result,
+      mergePriorityLevel,
+      context
+    );
+  }
+
+  private _mergeMetadataProviderDrafts(
+    origins: Entity[],
+    drafts: Entity[],
+    result: ScrapeProviderResult<Entity[]>,
+    mergePriorityLevels: Record<string, number>[],
+    context: ScrapeMergeContext
+  ) {
+    if (result.data.length !== drafts.length) {
+      this._logService.warn(
+        `Provider ${result.provider.id} returned ${result.data.length} draft(s) for ${drafts.length} request draft(s); skipping merge.`,
+        "",
+        true,
+        "ScrapeService"
+      );
+      return drafts.map((draft) => new Entity(draft));
+    }
+
+    return drafts.map((draft, index) => {
+      const merged = this._mergeMetadataProviderResult(
+        origins[index],
+        new Entity(draft),
+        {
+          ...result,
+          data: new Entity(result.data[index]),
+        },
+        mergePriorityLevels[index],
+        context
+      );
+      mergePriorityLevels[index] = merged.mergePriorityLevel;
+      return new Entity(merged.paperEntityDraft);
+    });
+  }
+
+  private async _executeMetadataProviderChain(request: ScrapeMetadataRequest) {
+    const origins = request.drafts.map((draft) => new Entity(draft));
+    const mergePriorityLevels = origins.map((draft) =>
+      this._createMergePriorityLevel(draft)
+    );
+    let currentRequest: ScrapeMetadataRequest = {
+      drafts: request.drafts.map((draft) => new Entity(draft)),
+      scrapers: [...request.scrapers],
+      force: request.force,
+    };
+
+    for (const [providerIndex, provider] of this._listProviders(
+      "metadata"
+    ).entries()) {
+      const execution = await this._executeMetadataProvider(
+        provider,
+        currentRequest
+      );
+      const nextRequest = {
+        drafts: execution.request.drafts.map((draft) => new Entity(draft)),
+        scrapers: [...execution.request.scrapers],
+        force: execution.request.force,
+      };
+
+      if (execution.result.status === "matched") {
+        nextRequest.drafts = this._mergeMetadataProviderDrafts(
+          origins,
+          currentRequest.drafts,
+          execution.result,
+          mergePriorityLevels,
+          this._createMergeContext(
+            provider,
+            providerIndex,
+            execution.request.force
+          )
+        );
+      }
+
+      currentRequest = nextRequest;
+    }
+
+    return {
+      drafts: currentRequest.drafts.map((draft) => new Entity(draft)),
+      scrapers: [...currentRequest.scrapers],
+      force: currentRequest.force,
+    };
   }
 
   private async _scrapeExtensionReady() {
@@ -417,7 +631,6 @@ export class ScrapeService extends Eventable<{}> {
   @processing(ProcessingKey.General)
   @errorcatching("Failed to scrape entry.", true, "ScrapeService", [])
   async scrapeEntry(payloads: any[]) {
-    const provider = this._selectProvider("entry");
     if (this._hookService.hasHook("beforeScrapeEntry")) {
       [payloads] = await this._hookService.modifyHookPoint(
         "beforeScrapeEntry",
@@ -426,7 +639,7 @@ export class ScrapeService extends Eventable<{}> {
       );
     }
 
-    let paperEntityDrafts: Entity[] = (await this._executeEntryProvider(provider, payloads)).data;
+    let paperEntityDrafts = await this._executeEntryProviderChain(payloads);
 
     if (this._hookService.hasHook("afterScrapeEntry")) {
       [paperEntityDrafts] = await this._hookService.modifyHookPoint(
@@ -455,8 +668,8 @@ export class ScrapeService extends Eventable<{}> {
     scrapers: string[],
     force: boolean = false
   ) {
-    const provider = this._selectProvider("metadata");
-    const rehydrateEntities = (drafts: Entity[]) => drafts.map((draft) => new Entity(draft));
+    const rehydrateEntities = (drafts: Entity[]) =>
+      drafts.map((draft) => new Entity(draft));
 
     if (this._hookService.hasHook("beforeScrapeMetadata")) {
       [paperEntityDrafts, scrapers, force] =
@@ -470,15 +683,14 @@ export class ScrapeService extends Eventable<{}> {
       paperEntityDrafts = rehydrateEntities(paperEntityDrafts);
     }
 
-    const metadataProviderExecution = await this._executeMetadataProvider(
-      provider,
-      paperEntityDrafts,
+    const metadataRequest = await this._executeMetadataProviderChain({
+      drafts: paperEntityDrafts,
       scrapers,
-      force
-    );
-    let scrapedPaperEntityDrafts = metadataProviderExecution.result.data;
-    scrapers = metadataProviderExecution.scrapers;
-    force = metadataProviderExecution.force;
+      force,
+    });
+    let scrapedPaperEntityDrafts = metadataRequest.drafts;
+    scrapers = metadataRequest.scrapers;
+    force = metadataRequest.force;
 
     if (this._hookService.hasHook("afterScrapeMetadata")) {
       [scrapedPaperEntityDrafts, scrapers, force] =
@@ -556,9 +768,7 @@ export class ScrapeService extends Eventable<{}> {
    * @returns List of paper entities. */
   @processing(ProcessingKey.General)
   @errorcatching("Failed to scrape entry.", true, "ScrapeService", [])
-  async _fuzzyScrape(
-    paperEntities: IEntityCollection
-  ): Promise<Entity[][]> {
+  async _fuzzyScrape(paperEntities: IEntityCollection): Promise<Entity[][]> {
     const provider = this._selectProvider("fuzzy");
     if (this._hookService.hasHook("beforeFuzzyScrape")) {
       [paperEntities] = await this._hookService.modifyHookPoint(
@@ -569,7 +779,7 @@ export class ScrapeService extends Eventable<{}> {
     }
 
     let paperEntityDraftCandidates = (
-      await this._executeFuzzyProvider(provider, paperEntities)
+      await this._executeFuzzyProvider(provider, { paperEntities })
     ).data;
 
     if (this._hookService.hasHook("afterScrapeEntry")) {

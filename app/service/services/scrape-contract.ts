@@ -1,4 +1,4 @@
-import { Entity } from "@/models/entity";
+import { Entity, IEntityCollection } from "@/models/entity";
 
 export type ScrapeProviderKind = "entry" | "metadata" | "fuzzy";
 export type ScrapeSeedKind = "entry-payload" | "entity-draft";
@@ -10,7 +10,11 @@ export type ScrapeMatchBasis =
   | "title"
   | "url"
   | "unknown";
-export type ScrapeExecutionStatus = "matched" | "skipped" | "no-match" | "error";
+export type ScrapeExecutionStatus =
+  | "matched"
+  | "skipped"
+  | "no-match"
+  | "error";
 
 export interface ScrapeProviderDescriptor {
   id: string;
@@ -41,4 +45,23 @@ export interface ScrapeMergeContext {
   providerId: string;
   providerIndex: number;
   force: boolean;
+}
+
+export interface ScrapeEntryRequest {
+  payloads: unknown[];
+}
+
+export interface ScrapeMetadataRequest {
+  drafts: Entity[];
+  scrapers: string[];
+  force: boolean;
+}
+
+export interface ScrapeMetadataProviderExecution {
+  result: ScrapeProviderResult<Entity[]>;
+  request: ScrapeMetadataRequest;
+}
+
+export interface ScrapeFuzzyRequest {
+  paperEntities: IEntityCollection;
 }
