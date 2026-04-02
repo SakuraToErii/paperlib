@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockUpdate = vi.fn(async (drafts: any[]) => drafts);
+const mockScrape = vi.fn();
 
 vi.mock("../../../app/models/entity", async () => {
   class Entity {
@@ -42,8 +43,8 @@ vi.mock("../../../app/base/misc", () => ({
   uid: vi.fn(() => "sup-1"),
 }));
 
-import { PaperService } from "../../../app/service/services/paper-service";
 import { uid } from "../../../app/base/misc";
+import { PaperService } from "../../../app/service/services/paper-service";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -60,7 +61,9 @@ describe("PaperService file import placeholder titles", () => {
       {
         on: vi.fn(),
       } as any,
-      {} as any,
+      {
+        scrape: mockScrape,
+      } as any,
       {} as any,
       {
         createTask: vi.fn(),
@@ -73,6 +76,7 @@ describe("PaperService file import placeholder titles", () => {
 
   beforeEach(() => {
     mockUpdate.mockClear();
+    mockScrape.mockReset();
     vi.mocked(uid).mockClear();
     vi.mocked(uid).mockReturnValue("sup-1");
     globalThis.PLAPILocal = {
@@ -82,29 +86,83 @@ describe("PaperService file import placeholder titles", () => {
     };
   });
 
-  it("uses the imported file name stem instead of the absolute path", async () => {
+  it("routes file imports through scrape and keeps fallback files attached", async () => {
     const service = createService();
+    mockScrape.mockResolvedValue([
+      {
+        title: "Scraped Deep Learning Survey",
+        authors: "Ada Lovelace",
+      },
+    ]);
 
-    const updateSpy = vi.spyOn(service, "update").mockImplementation(mockUpdate as any);
+    const updateSpy = vi
+      .spyOn(service, "update")
+      .mockImplementation(mockUpdate as any);
 
-    const [draft] = await service.create(["/Users/testuser/Papers/Deep Learning Survey.pdf"]);
+    const [draft] = await service.create([
+      "/Users/testuser/Papers/Deep Learning Survey.pdf",
+    ]);
 
-    expect(draft.title).toBe("Deep Learning Survey");
-    expect(draft.supplementaries["sup-1"].url).toBe("/Users/testuser/Papers/Deep Learning Survey.pdf");
+    expect(mockScrape).toHaveBeenCalledWith(
+      [
+        {
+          type: "file",
+          value: "/Users/testuser/Papers/Deep Learning Survey.pdf",
+        },
+      ],
+      [],
+      false
+    );
+    expect(draft.title).toBe("Scraped Deep Learning Survey");
+    expect(draft.supplementaries["sup-1"].url).toBe(
+      "/Users/testuser/Papers/Deep Learning Survey.pdf"
+    );
     expect(draft.defaultSup).toBe("sup-1");
 
     updateSpy.mockRestore();
   });
 
-  it("derives a clean title from file URLs too", async () => {
+  it("derives a clean title from file URLs when scrape yields no metadata", async () => {
     const service = createService();
+    mockScrape.mockResolvedValue([]);
 
-    const updateSpy = vi.spyOn(service, "update").mockImplementation(mockUpdate as any);
+    const updateSpy = vi
+      .spyOn(service, "update")
+      .mockImplementation(mockUpdate as any);
 
-    const [draft] = await service.create(["file:///Users/testuser/Papers/Graph%20Nets.pdf"]);
+    const [draft] = await service.create([
+      "file:///Users/testuser/Papers/Graph%20Nets.pdf",
+    ]);
 
     expect(draft.title).toBe("Graph Nets");
-    expect(draft.supplementaries["sup-1"].url).toBe("file:///Users/testuser/Papers/Graph%20Nets.pdf");
+    expect(draft.supplementaries["sup-1"].url).toBe(
+      "file:///Users/testuser/Papers/Graph%20Nets.pdf"
+    );
+
+    updateSpy.mockRestore();
+  });
+
+  it("restores fallback titles for incomplete scrape drafts", async () => {
+    const service = createService();
+    mockScrape.mockResolvedValue([
+      {
+        title: "",
+        authors: "Recovered Author",
+      },
+    ]);
+
+    const updateSpy = vi
+      .spyOn(service, "update")
+      .mockImplementation(mockUpdate as any);
+
+    const [draft] = await service.create([
+      "/Users/testuser/Papers/Untitled Draft.pdf",
+    ]);
+
+    expect(draft.title).toBe("Untitled Draft");
+    expect(draft.supplementaries["sup-1"].url).toBe(
+      "/Users/testuser/Papers/Untitled Draft.pdf"
+    );
 
     updateSpy.mockRestore();
   });
